@@ -1,5 +1,3 @@
-// Frontend Socket Connection for Next.js
-// Install socket.io-client: npm install socket.io-client
 
 import { io, Socket } from 'socket.io-client';
 
