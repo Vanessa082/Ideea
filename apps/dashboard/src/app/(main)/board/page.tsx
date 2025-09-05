@@ -1,7 +1,6 @@
 "use client";
-
 import { useState } from "react";
-import { Button } from "../../core/components/ui/button";
+import { Button } from "../../../core/components/ui/button";
 import { EmptyOrg } from "@/core/components/dashboard/emptyorg";
 import { NewBoardModal } from "@/core/components/dashboard/board/new-baord-modal";
 import { ProtectedRoute } from "@/core/components/auth/RouteGuard";
