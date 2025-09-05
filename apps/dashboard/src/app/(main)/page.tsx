@@ -19,7 +19,7 @@ const DashboardPage = () => {
           </Button>
         </div>
 
-        <NewBoardModal open={open} onClose={() => setOpen(false)} />
+        <NewBoardModal open={open} onClose={() => setOpen(false)} creator={""} />
       </ProtectedRoute>
     </>
   );

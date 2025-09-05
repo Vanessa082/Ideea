@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import AuthWrapper from "@/core/components/providers/AuthWrapper";
 import Sidebar from "@/core/components/dashboard/sidebar/sidebar";
 import { Navbar } from "@/core/components/dashboard/navbar";
 
@@ -27,9 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <main className="h-full">
-          {children}
-        </main>
+        <AuthWrapper>
+          <main className="h-full">
+            {children}
+          </main>
+        </AuthWrapper>
       </body>
     </html>
   );
