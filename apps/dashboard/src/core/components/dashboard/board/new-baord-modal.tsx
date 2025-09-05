@@ -30,6 +30,7 @@ interface NewBoardModalProps {
 export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
   const router = useRouter();
   const [boardId, setBoardId] = useState<string | null>(null);
+<<<<<<< Updated upstream
 
   const boardUrl = boardId
     ? `${window.location.origin}/board/${boardId}`
@@ -38,6 +39,26 @@ export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
   const handleOpen = async () => {
     const id = await createBoard();
     setBoardId(id);
+=======
+  const [boardName, setBoardName] = useState<string>("");
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+
+  const boardUrl = inviteLink || (boardId
+    ? `${window.location.origin}/board/${boardId}?invite=${creator}`
+    : "");
+
+  const handleCreateBoard = async () => {
+    if (!boardName.trim()) return;
+    try {
+      const result = await createBoardApi({ roomId: "", name: boardName, creator });
+      setBoardId(result.roomId);
+      if (result.inviteLink) {
+        setInviteLink(result.inviteLink);
+      }
+    } catch (error) {
+      toast.error("Failed to create board");
+    }
+>>>>>>> Stashed changes
   };
 
   const copyToClipboard = () => {
