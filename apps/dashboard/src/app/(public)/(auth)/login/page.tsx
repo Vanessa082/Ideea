@@ -1,11 +1,16 @@
+import { PublicRoute } from "@/core/components/auth/RouteGuard";
+import LoginForm from "@/core/feature/pages/auth/login";
 import type { Metadata } from "next";
-import LoginForm from "../../../../core/feature/pages/auth/login";
 
 export const metadata: Metadata = {
   title: "Login",
-  description: "Idea login page. Sign in to your account",
+  description: "Idea Login page. Complete sign in process",
 };
 
 export default function LoginPage() {
-  return <LoginForm />;
+  return (
+    <PublicRoute>
+      <LoginForm />
+    </PublicRoute>
+  );
 }
