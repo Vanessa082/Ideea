@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
 import { useAuth } from "../../../../../context/authContext";
+import Link from "next/link";
 
 interface FormData {
   email: string;
@@ -98,7 +99,7 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full flex flex-col gap-2 max-w-md mx-auto">
       <h1 className="text-2xl font-semibold text-foreground text-center mb-6">
         Welcome Back
       </h1>
@@ -142,6 +143,7 @@ export default function LoginForm() {
           {isSubmitting ? "Logging in..." : "Login"}
         </Button>
       </form>
+      <p className="text-center">No Account? <Link href="/register">Register</Link></p>
     </div>
   );
 }
