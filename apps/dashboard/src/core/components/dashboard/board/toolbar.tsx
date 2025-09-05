@@ -1,4 +1,3 @@
-// apps/dashboard/src/components/Toolbar.tsx
 "use client";
 
 import { useBoardStore } from "../../../../../store/board-store";

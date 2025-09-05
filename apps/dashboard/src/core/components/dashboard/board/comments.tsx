@@ -28,7 +28,7 @@ export const CommentsPanel = () => {
   };
 
   return (
-    <aside className="flex w-72 flex-col border-l bg-white">
+    <aside className="flex flex-col border-l bg-white">
       <div className="border-b p-3">
         <h3 className="font-semibold">Comments</h3>
       </div>

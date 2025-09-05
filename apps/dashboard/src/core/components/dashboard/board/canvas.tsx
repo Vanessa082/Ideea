@@ -11,7 +11,7 @@ import socketService from "@/utils/socketService";
 import { UserPresence, useUserPresenceStore } from "./user-presence";
 import { Toolbar } from "./toolbar";
 import { ElementRenderer } from "./element-render";
-import { CommentsPanel } from "./comments";
+// import { CommentsPanel } from "./comments";
 
 // Define a type for our Konva Stage and Transformer refs
 type KonvaStageRef = Konva.Stage | null;
@@ -178,9 +178,9 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
   }, [selectedElementId]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex justify-between overflow-hidden">
       <Toolbar />
-      <div className="flex-1">
+      <div className="">
         <Stage
           width={window.innerWidth}
           height={window.innerHeight}
@@ -204,7 +204,7 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
           </Layer>
         </Stage>
       </div>
-      <CommentsPanel />
+      {/* <CommentsPanel /> */}
     </div>
   );
 }
