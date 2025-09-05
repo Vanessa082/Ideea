@@ -11,6 +11,7 @@ import socketService from "../../../../utils/socketService";
 import { UserPresence, useUserPresenceStore } from "./user-presence";
 import { Toolbar } from "./toolbar";
 import { ElementRenderer } from "./element-render";
+import { getCanvas, updateCanvas } from "../../../../utils/canvasApi";
 
 // Define a type for our Konva Stage and Transformer refs
 type KonvaStageRef = Konva.Stage | null;
@@ -68,6 +69,30 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
       }
     }
   }, [addElement]);
+
+  // Fetch canvas data from backend on component mount
+  useEffect(() => {
+    const fetchCanvasData = async () => {
+      try {
+        console.log('Fetching canvas data for board:', boardId);
+        const canvasData = await getCanvas(boardId);
+        if (canvasData && canvasData.data && Array.isArray(canvasData.data)) {
+          console.log('Loaded canvas data:', canvasData.data);
+          // Clear existing elements and load from backend
+          setElements([]);
+          canvasData.data.forEach((element: CanvasElement) => {
+            addElement(element);
+          });
+        } else {
+          console.log('No canvas data found or invalid format');
+        }
+      } catch (error) {
+        console.error('Failed to fetch canvas data:', error);
+      }
+    };
+
+    fetchCanvasData();
+  }, [boardId, addElement, setElements]);
 
   useEffect(() => {
     socketService.connect();

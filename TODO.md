@@ -1,0 +1,5 @@
+- [ ] Update NewBoardModal props to accept creator userId
+- [ ] Add board name input to the modal
+- [ ] Update createBoard function to call backend API with userId and board name
+- [ ] Generate invite link with boardId and userId
+- [ ] Show invite link in modal and allow copying

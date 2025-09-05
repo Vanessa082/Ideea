@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { v4 as uuid } from "uuid";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import {
@@ -13,31 +12,31 @@ import {
   DialogFooter,
 } from "../../ui/dialog";
 import { toast } from "sonner";
-
-/**
- * Mocks the backend API call to create a new board.
- * In a real application, this would send an API request and return a board ID from the server.
- */
-async function createBoard(): Promise<string> {
-  return uuid();
-}
+import { createBoard as createBoardApi } from "../../../../utils/canvasApi";
 
 interface NewBoardModalProps {
   open: boolean;
   onClose: () => void;
+  creator: string;
 }
 
-export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
+export const NewBoardModal = ({ open, onClose, creator }: NewBoardModalProps) => {
   const router = useRouter();
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [boardName, setBoardName] = useState<string>("");
 
   const boardUrl = boardId
-    ? `${window.location.origin}/board/${boardId}`
+    ? `${window.location.origin}/board/${boardId}?invite=${creator}`
     : "";
 
-  const handleOpen = async () => {
-    const id = await createBoard();
-    setBoardId(id);
+  const handleCreateBoard = async () => {
+    if (!boardName.trim()) return;
+    try {
+      const result = await createBoardApi({ roomId: "", name: boardName, creator });
+      setBoardId(result.roomId);
+    } catch (error) {
+      toast.error("Failed to create board");
+    }
   };
 
   const copyToClipboard = () => {
@@ -54,12 +53,26 @@ export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent onOpenAutoFocus={handleOpen}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Board</DialogTitle>
         </DialogHeader>
 
-        {boardId ? (
+        {!boardId ? (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="boardName" className="text-sm font-medium">
+                Board Name
+              </label>
+              <Input
+                id="boardName"
+                value={boardName}
+                onChange={(e) => setBoardName(e.target.value)}
+                placeholder="Enter board name"
+              />
+            </div>
+          </div>
+        ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Share this link to invite others:
@@ -71,14 +84,18 @@ export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
               </Button>
             </div>
           </div>
-        ) : (
-          <p>Generating link...</p>
         )}
 
         <DialogFooter>
-          <Button onClick={handleCreate} disabled={!boardId}>
-            Create & Open
-          </Button>
+          {!boardId ? (
+            <Button onClick={handleCreateBoard} disabled={!boardName.trim()}>
+              Create Board
+            </Button>
+          ) : (
+            <Button onClick={handleCreate}>
+              Open Board
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
