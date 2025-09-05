@@ -1,5 +1,5 @@
-import RegisterForm from "@/core/feature/pages/auth/register";
 import type { Metadata } from "next";
+import RegisterForm from "../../../core/feature/pages/auth/register-form";
 
 export const metadata: Metadata = {
   title: "Registration",
