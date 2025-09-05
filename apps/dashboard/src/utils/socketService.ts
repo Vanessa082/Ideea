@@ -1,42 +1,29 @@
-
 import { io, Socket } from 'socket.io-client';
+import { BoardEvent, UserPresence, CanvasElement } from '../core/types/board.types';
 
-interface UserJoinedData {
+// Define event payloads for type safety
+interface JoinBoardPayload {
+  boardId: string;
   userId: string;
 }
 
-interface UserLeftData {
-  userId: string;
+interface PresenceUpdatePayload {
+  boardId: string;
+  user: UserPresence;
 }
 
-interface MessageData {
-  roomId?: string;
-  message?: string;
-  userId?: string;
-  [key: string]: any;
-}
-
-interface DrawData {
-  roomId: string;
-  drawData: any;
-  userId: string;
-}
-
-interface BrainstormData {
-  roomId: string;
-  brainstormData: any;
-  userId: string;
-}
-
-// Socket connection utility
 class SocketService {
   private socket: Socket | null = null;
   public isConnected: boolean = false;
 
-  connect() {
+  /**
+   * Establishes a WebSocket connection to the server.
+   * This method ensures a connection is only made once.
+   */
+  public connect() {
     if (this.socket?.connected) return;
 
-    this.socket = io('http://localhost:3000', {
+    this.socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
       transports: ['websocket', 'polling'],
       upgrade: true,
     });
@@ -50,30 +37,12 @@ class SocketService {
       console.log('Disconnected from server');
       this.isConnected = false;
     });
-
-    // Listen for brainstorm events
-    this.socket.on('userJoined', (data: UserJoinedData) => {
-      console.log('User joined:', data.userId);
-    });
-
-    this.socket.on('userLeft', (data: UserLeftData) => {
-      console.log('User left:', data.userId);
-    });
-
-    this.socket.on('message', (data: MessageData) => {
-      console.log('New message:', data);
-    });
-
-    this.socket.on('draw', (data: DrawData) => {
-      console.log('Draw event:', data);
-    });
-
-    this.socket.on('brainstormUpdated', (data: BrainstormData) => {
-      console.log('Brainstorm updated:', data);
-    });
   }
 
-  disconnect() {
+  /**
+   * Disconnects from the WebSocket server.
+   */
+  public disconnect() {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -81,48 +50,50 @@ class SocketService {
     }
   }
 
-  // Room management
-  joinRoom(roomId: string, userId: string) {
+  /**
+   * Emits a 'join-board' event to the server to join a specific room.
+   */
+  public joinBoard(boardId: string, userId: string) {
     if (this.socket) {
-      this.socket.emit('joinRoom', { roomId, userId });
+      this.socket.emit('join-board', { boardId, userId } as JoinBoardPayload);
     }
   }
 
-  leaveRoom(roomId: string, userId: string) {
+  /**
+   * Emits an 'element:add' event to the server.
+   */
+  public sendElementAdd(boardId: string, element: CanvasElement) {
     if (this.socket) {
-      this.socket.emit('leaveRoom', { roomId, userId });
+      this.socket.emit('element:add', { boardId, element } as BoardEvent);
     }
   }
 
-  // Chat functionality
-  sendMessage(roomId: string, message: string, userId: string) {
+  /**
+   * Emits an 'element:update' event to the server.
+   */
+  public sendElementUpdate(boardId: string, element: CanvasElement) {
     if (this.socket) {
-      this.socket.emit('sendMessage', { roomId, message, userId });
+      this.socket.emit('element:update', { boardId, element } as BoardEvent);
     }
   }
 
-  // Drawing functionality
-  sendDrawData(roomId: string, drawData: any, userId: string) {
+  /**
+   * Emits a 'presence:update' event to the server.
+   */
+  public sendPresenceUpdate(boardId: string, user: UserPresence) {
     if (this.socket) {
-      this.socket.emit('draw', { roomId, drawData, userId });
+      this.socket.emit('presence:update', { boardId, user } as PresenceUpdatePayload);
     }
   }
 
-  // Brainstorm updates
-  updateBrainstorm(roomId: string, brainstormData: any, userId: string) {
-    if (this.socket) {
-      this.socket.emit('updateBrainstorm', { roomId, brainstormData, userId });
-    }
-  }
-
-  // General message
-  sendGeneralMessage(data: any) {
-    if (this.socket) {
-      this.socket.emit('message', data);
-    }
+  /**
+   * Provides access to the underlying Socket.IO instance for event listening.
+   */
+  public get socketInstance(): Socket | null {
+    return this.socket;
   }
 }
 
-// Export singleton instance
+// Export a singleton instance of the service
 const socketService = new SocketService();
 export default socketService;
