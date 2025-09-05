@@ -1,99 +1,88 @@
-import { io, Socket } from 'socket.io-client';
-import { BoardEvent, UserPresence, CanvasElement } from '../core/types/board.types';
-
-// Define event payloads for type safety
-interface JoinBoardPayload {
-  boardId: string;
-  userId: string;
-}
-
-interface PresenceUpdatePayload {
-  boardId: string;
-  user: UserPresence;
-}
+import io, { Socket } from 'socket.io-client';
 
 class SocketService {
   private socket: Socket | null = null;
-  public isConnected: boolean = false;
 
-  /**
-   * Establishes a WebSocket connection to the server.
-   * This method ensures a connection is only made once.
-   */
-  public connect() {
-    if (this.socket?.connected) return;
-
-    this.socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
-      transports: ['websocket', 'polling'],
-      upgrade: true,
-    });
-
-    this.socket.on('connect', () => {
-      console.log('Connected to server:', this.socket?.id);
-      this.isConnected = true;
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from server');
-      this.isConnected = false;
-    });
+  connect() {
+    if (!this.socket) {
+      this.socket = io('http://localhost:3000');
+      this.socket.on('connect', () => {
+        console.log('Connected to socket server');
+      });
+      this.socket.on('disconnect', () => {
+        console.log('Disconnected from socket server');
+      });
+    }
   }
 
-  /**
-   * Disconnects from the WebSocket server.
-   */
-  public disconnect() {
+  disconnect() {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-      this.isConnected = false;
     }
   }
 
-  /**
-   * Emits a 'join-board' event to the server to join a specific room.
-   */
-  public joinBoard(boardId: string, userId: string) {
+  joinBoard(boardId: string, userId: string) {
     if (this.socket) {
-      this.socket.emit('join-board', { boardId, userId } as JoinBoardPayload);
+      this.socket.emit('joinRoom', { roomId: boardId, userId });
     }
   }
 
-  /**
-   * Emits an 'element:add' event to the server.
-   */
-  public sendElementAdd(boardId: string, element: CanvasElement) {
+  leaveBoard(boardId: string, userId: string) {
     if (this.socket) {
-      this.socket.emit('element:add', { boardId, element } as BoardEvent);
+      this.socket.emit('leaveRoom', { roomId: boardId, userId });
     }
   }
 
-  /**
-   * Emits an 'element:update' event to the server.
-   */
-  public sendElementUpdate(boardId: string, element: CanvasElement) {
+  sendDraw(boardId: string, drawData: any, userId: string) {
+    console.log('🚨 SENDING DRAW EVENT:', {
+      boardId,
+      drawData: {
+        type: drawData.type,
+        id: drawData.id,
+        pointsLength: drawData.points?.length,
+        width: drawData.width,
+        height: drawData.height
+      },
+      userId,
+      stack: new Error().stack // This will show you exactly where sendDraw is being called from
+    });
+    
     if (this.socket) {
-      this.socket.emit('element:update', { boardId, element } as BoardEvent);
+      this.socket.emit('draw', { roomId: boardId, drawData, userId });
     }
   }
 
-  /**
-   * Emits a 'presence:update' event to the server.
-   */
-  public sendPresenceUpdate(boardId: string, user: UserPresence) {
+  onDraw(callback: (data: { drawData: any; userId: string }) => void) {
     if (this.socket) {
-      this.socket.emit('presence:update', { boardId, user } as PresenceUpdatePayload);
+      this.socket.on('draw', callback);
     }
   }
 
-  /**
-   * Provides access to the underlying Socket.IO instance for event listening.
-   */
-  public get socketInstance(): Socket | null {
+  offDraw() {
+    if (this.socket) {
+      this.socket.off('draw');
+    }
+  }
+
+  sendElementAdd(boardId: string, element: any) {
+    console.log('📝 SENDING ELEMENT ADD:', element.type, element.id);
+    if (this.socket) {
+      this.socket.emit('element:add', { boardId, element });
+    }
+  }
+
+  sendElementUpdate(boardId: string, element: any) {
+    console.log('✏️ SENDING ELEMENT UPDATE:', element.type, element.id);
+    if (this.socket) {
+      this.socket.emit('element:update', { boardId, element });
+    }
+  }
+
+  get socketInstance() {
     return this.socket;
   }
 }
 
-// Export a singleton instance of the service
 const socketService = new SocketService();
 export default socketService;
