@@ -51,7 +51,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
 const ACCESS_TOKEN_STORAGE_KEY = "accessToken";
 const USER_STORAGE_KEY = "user";
 
-// Helper function to decode JWT (no secret needed!)
 const decodeJWT = (token: string) => {
   try {
     const base64Url = token.split(".")[1];
