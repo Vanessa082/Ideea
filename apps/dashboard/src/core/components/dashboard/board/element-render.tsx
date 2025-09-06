@@ -1,5 +1,5 @@
 import { useBoardStore } from "../../../../../store/board-store";
-import { Line, Rect, Circle, Text } from "react-konva";
+import { Line, Rect, Circle, Text, Arrow } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
 import { CanvasElement } from "../../../types/board.types";
 
@@ -62,6 +62,12 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({ onElementClick
           return false;
         }
         return true;
+      case 'arrow':
+        if (!Array.isArray(element.points) || element.points.length < 4) {
+          console.warn('Invalid arrow element (insufficient points):', element);
+          return false;
+        }
+        return true;
       default:
         console.warn('Unknown element type:', element.type);
         return false;
@@ -93,7 +99,7 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({ onElementClick
                   id={element.id}
                   points={points}
                   stroke={element.color || '#000000'}
-                  strokeWidth={5}
+                  strokeWidth={element.strokeWidth || 5}
                   lineCap="round"
                   tension={0.5}
                   bezier={true}
@@ -166,6 +172,31 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({ onElementClick
                   x={element.x}
                   y={element.y}
                   text={element.text || ''}
+                  fill={element.color || '#000000'}
+                  onClick={onElementClick}
+                  draggable
+                  onDragEnd={(e) => {
+                    const node = e.target;
+                    const newElement = {
+                      ...element,
+                      x: node.x(),
+                      y: node.y(),
+                    };
+                    updateElement(newElement);
+                    onElementDragEnd(newElement);
+                  }}
+                />
+              );
+            case "arrow":
+              // Points are already validated above
+              const arrowPoints = Array.isArray(element.points) ? element.points.filter(p => typeof p === 'number') : [];
+              return (
+                <Arrow
+                  key={element.id}
+                  id={element.id}
+                  points={arrowPoints}
+                  stroke={element.color || '#000000'}
+                  strokeWidth={element.strokeWidth || 5}
                   fill={element.color || '#000000'}
                   onClick={onElementClick}
                   draggable

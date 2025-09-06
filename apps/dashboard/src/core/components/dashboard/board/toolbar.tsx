@@ -2,19 +2,26 @@
 
 import { useBoardStore } from "../../../../../store/board-store";
 import { Button } from "../../ui/button";
-import { Circle, Eraser, Pen, RectangleCircle, RectangleHorizontal, Redo2Icon, Undo2Icon } from "lucide-react";
+import { Circle, Eraser, Pen, RectangleCircle, RectangleHorizontal, Redo2Icon, Undo2Icon, Paintbrush, ArrowRight, Minus, Droplet } from "lucide-react";
 
 export const Toolbar = () => {
   const { setTool, setColor, currentTool, undo, redo } = useBoardStore();
 
   return (
-    <div className="flex w-20 h-fit flex-col items-center gap-2 border-r bg-chart-4 p-3 text-white">
+    <div className="flex w-20 md:w-20 h-16 flex-col items-center gap-2 border-r bg-chart-4 p-3 text-white md:flex-col md:h-[calc(100vh_-_5rem)] md:max-w-md md:border-l md:text-black h-16 overflow-x-auto">
       <Button
         size="sm"
         variant={currentTool === "pen" ? "default" : "secondary"}
         onClick={() => setTool("pen")}
       >
         <Pen />
+      </Button>
+      <Button
+        size="sm"
+        variant={currentTool === "brush" ? "default" : "secondary"}
+        onClick={() => setTool("brush")}
+      >
+        <Paintbrush />
       </Button>
       <Button
         size="sm"
@@ -36,6 +43,27 @@ export const Toolbar = () => {
         onClick={() => setTool("text")}
       >
         T
+      </Button>
+      <Button
+        size="sm"
+        variant={currentTool === "line" ? "default" : "secondary"}
+        onClick={() => setTool("line")}
+      >
+        <Minus />
+      </Button>
+      <Button
+        size="sm"
+        variant={currentTool === "arrow" ? "default" : "secondary"}
+        onClick={() => setTool("arrow")}
+      >
+        <ArrowRight />
+      </Button>
+      <Button
+        size="sm"
+        variant={currentTool === "fill" ? "default" : "secondary"}
+        onClick={() => setTool("fill")}
+      >
+        <Droplet />
       </Button>
       <Button
         size="sm"

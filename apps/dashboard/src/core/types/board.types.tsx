@@ -4,7 +4,7 @@ export type Vector2d = {
   y: number;
 };
 
-export type ElementType = 'line' | 'rectangle' | 'circle' | 'text';
+export type ElementType = 'line' | 'rectangle' | 'circle' | 'text' | 'arrow';
 
 export interface CanvasElement {
   id: string;
@@ -16,6 +16,7 @@ export interface CanvasElement {
   height?: number;
   color: string;
   text?: string;
+  strokeWidth?: number;
   isDragging?: boolean;
 }
 
@@ -24,7 +25,7 @@ export interface BoardEvent {
   element: CanvasElement;
 }
 
-export type ToolType = 'pen' | 'eraser' | 'rectangle' | 'circle' | 'text';
+export type ToolType = 'pen' | 'eraser' | 'rectangle' | 'circle' | 'text' | 'brush' | 'arrow' | 'line' | 'fill';
 
 export interface UserPresence {
   id: string;

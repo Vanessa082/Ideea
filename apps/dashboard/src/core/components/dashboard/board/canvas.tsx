@@ -19,10 +19,22 @@ type KonvaTransformerRef = Konva.Transformer | null;
 export default function BoardCanvas({ boardId }: { boardId: string }) {
   const stageRef = useRef<KonvaStageRef>(null);
   const transformerRef = useRef<KonvaTransformerRef>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   // Track if we're currently drawing to prevent duplicate events
   const currentlyDrawingRef = useRef<string | null>(null);
+
+  // Text editing state
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [editingTextValue, setEditingTextValue] = useState<string>('');
+  const [editingTextPosition, setEditingTextPosition] = useState({ x: 0, y: 0 });
+
+  // Eraser state
+  const lastErasedRef = useRef<string | null>(null);
+
+  // Line/arrow start position
+  const [lineStart, setLineStart] = useState<Vector2d | null>(null);
 
   const {
     elements,
@@ -39,11 +51,32 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
 
   const { addOrUpdateUser } = useUserPresenceStore();
 
+  // Update dimensions on window resize and initial load
   useEffect(() => {
-    setDimensions({
-      width: typeof window !== 'undefined' ? window.innerWidth : 800,
-      height: typeof window !== 'undefined' ? window.innerHeight : 600,
-    });
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setDimensions({
+          width: rect.width,
+          height: rect.height,
+        });
+      } else {
+        // Fallback dimensions
+        setDimensions({
+          width: Math.max(320, window.innerWidth - 320), // Account for toolbar width
+          height: Math.max(400, window.innerHeight - 120), // Account for navbar height
+        });
+      }
+    };
+
+    updateDimensions();
+    
+    const handleResize = () => {
+      updateDimensions();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Load initial board from REST API
@@ -161,6 +194,20 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
           text: drawData.text,
         };
 
+      case 'arrow':
+        if (!Array.isArray(drawData.points) || drawData.points.length < 4) {
+          console.warn('Invalid arrow: points must be an array with at least 4 elements');
+          return null;
+        }
+        return {
+          ...baseValidation,
+          type: 'arrow',
+          points: drawData.points.map((p: any) => typeof p === 'number' ? p : 0),
+          width: 0,
+          height: 0,
+          text: '',
+        };
+
       default:
         console.warn(`Unsupported shape type: ${drawData.type}`);
         return null;
@@ -187,6 +234,21 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
       return; // Do not start drawing
     }
 
+    if (currentTool === 'fill') {
+      // Fill tool: change color of clicked shape
+      const shape = stage.getIntersection(pos as any);
+      const id = shape?.id?.();
+      if (id) {
+        const element = elements.find(el => el.id === id);
+        if (element) {
+          const updatedElement = { ...element, color: currentColor };
+          updateElement(updatedElement);
+          socketService.sendElementUpdate(boardId, updatedElement);
+        }
+      }
+      return;
+    }
+
     if (currentTool === 'pen') {
       setDrawing(true);
       const elementId = uuidv4();
@@ -197,6 +259,20 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
         points: [pos.x, pos.y], // start with first point
         x: 0, y: 0,
         color: currentColor,
+        strokeWidth: 5,
+      };
+      addElement(newElement);
+    } else if (currentTool === 'brush') {
+      setDrawing(true);
+      const elementId = uuidv4();
+      currentlyDrawingRef.current = elementId;
+      const newElement: CanvasElement = {
+        id: elementId,
+        type: 'line',
+        points: [pos.x, pos.y], // start with first point
+        x: 0, y: 0,
+        color: currentColor,
+        strokeWidth: 10,
       };
       addElement(newElement);
     } else if (currentTool === 'rectangle') {
@@ -223,6 +299,8 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
         color: currentColor,
       };
       addElement(newElement);
+    } else if (currentTool === 'line' || currentTool === 'arrow') {
+      setLineStart(pos);
     } else if (currentTool === 'text') {
       const newElement: CanvasElement = {
         id: uuidv4(),
@@ -248,10 +326,22 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
   };
 
   const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
-    if (!isDrawing || !currentlyDrawingRef.current) return;
     const stage = e.target.getStage();
     if (!stage) return;
     const pos = getPointerPosition(stage);
+
+    if (currentTool === 'eraser') {
+      // Eraser on drag
+      const shape = stage.getIntersection(pos as any);
+      const id = shape?.id?.();
+      if (id && id !== lastErasedRef.current) {
+        useBoardStore.getState().removeElement(id);
+        lastErasedRef.current = id;
+      }
+      return;
+    }
+
+    if (!isDrawing || !currentlyDrawingRef.current) return;
     const latestElement = elements[elements.length - 1];
 
     if (!latestElement || latestElement.id !== currentlyDrawingRef.current) return;
@@ -284,6 +374,28 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
   };
 
   const handleMouseUp = () => {
+    if (lineStart) {
+      // Create line or arrow
+      const stage = stageRef.current;
+      if (!stage) return;
+      const pos = getPointerPosition(stage);
+      const elementId = uuidv4();
+      const newElement: CanvasElement = {
+        id: elementId,
+        type: currentTool === 'arrow' ? 'arrow' : 'line',
+        points: [lineStart.x, lineStart.y, pos.x, pos.y],
+        x: 0, y: 0,
+        color: currentColor,
+        strokeWidth: 5,
+      };
+      addElement(newElement);
+      useBoardStore.getState().persistDraw(boardId, newElement);
+      socketService.sendElementAdd(boardId, newElement);
+      socketService.sendDraw(boardId, newElement, "some-user-id");
+      setLineStart(null);
+      return;
+    }
+
     if (isDrawing && currentlyDrawingRef.current) {
       setDrawing(false);
       const latestElement = elements[elements.length - 1];
@@ -307,6 +419,8 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
       // Clear the currently drawing reference
       currentlyDrawingRef.current = null;
     }
+    // Reset eraser last erased
+    lastErasedRef.current = null;
   };
 
   // Helper function to check if a shape is complete
@@ -341,9 +455,17 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
   }, [selectedElementId]);
 
   return (
-    <div className="flex justify-between overflow-hidden">
-      <Toolbar />
-      <div className="">
+    <div className="flex h-screen w-full overflow-hidden">
+      {/* Toolbar - fixed width on larger screens, collapsible on mobile */}
+      <div className="flex-shrink-0">
+        <Toolbar />
+      </div>
+      
+      {/* Canvas container - fills remaining space */}
+      <div 
+        ref={containerRef}
+        className="flex-1 min-w-0 min-h-0 relative overflow-hidden"
+      >
         <Stage
           width={dimensions.width}
           height={dimensions.height}
@@ -356,7 +478,22 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
             <ElementRenderer onElementClick={(e: KonvaEventObject<MouseEvent>) => {
               const node = e.target;
               if ('id' in node) { // Check if node has an id property
-                setSelectedElement(node.id());
+                const id = node.id();
+                setSelectedElement(id);
+                // Check if it's a text element for editing
+                const element = elements.find(el => el.id === id);
+                if (element && element.type === 'text') {
+                  const rect = node.getClientRect();
+                  const stageBox = stageRef.current?.container().getBoundingClientRect();
+                  if (stageBox) {
+                    setEditingTextId(id);
+                    setEditingTextValue(element.text || '');
+                    setEditingTextPosition({
+                      x: stageBox.left + rect.x,
+                      y: stageBox.top + rect.y,
+                    });
+                  }
+                }
               }
               e.cancelBubble = true;
             }} onElementDragEnd={onElementDragEnd} />
@@ -364,8 +501,39 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
           </Layer>
           <UserPresence />
         </Stage>
+        
+        {/* Text editing input */}
+        {editingTextId && (
+          <input
+            type="text"
+            value={editingTextValue}
+            onChange={(e) => setEditingTextValue(e.target.value)}
+            onBlur={() => {
+              if (editingTextId) {
+                const updatedElement = elements.find(el => el.id === editingTextId);
+                if (updatedElement) {
+                  const newElement = { ...updatedElement, text: editingTextValue };
+                  updateElement(newElement);
+                  socketService.sendElementUpdate(boardId, newElement);
+                }
+              }
+              setEditingTextId(null);
+              setEditingTextValue('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.currentTarget.blur();
+              }
+            }}
+            className="absolute z-[1000] px-2 py-1 text-base border border-gray-300 bg-white rounded shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              left: Math.max(0, Math.min(editingTextPosition.x, dimensions.width - 200)),
+              top: Math.max(0, Math.min(editingTextPosition.y, dimensions.height - 40)),
+            }}
+            autoFocus
+          />
+        )}
       </div>
-      {/* <CommentsPanel /> */}
     </div>
   );
 }
