@@ -17,7 +17,7 @@ export default function HomeRedirectPage() {
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
-        router.replace("/main");
+        router.replace("/board");
       } else {
         router.replace("/login");
       }

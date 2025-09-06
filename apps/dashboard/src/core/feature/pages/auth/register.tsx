@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { v4 as uuid } from "uuid";
 import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
 import EmailVerificationModal from "@/core/components/auth/verificationModal";
 import { useAuth } from "../../../../../context/authContext";
+import { createBoard } from "../../../../utils/canvasApi";
 
 interface FormData {
   username: string;
@@ -33,7 +35,7 @@ export default function RegisterForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
 
-  const { register } = useAuth();
+  const { register, user } = useAuth();
   const router = useRouter();
   console.log("welcome to regitration page");
   useEffect(() => {
@@ -97,9 +99,25 @@ export default function RegisterForm() {
       const res = await register(registrationData);
       console.log("→ register() resolved:", res);
 
-      // Show verification modal on successful registration
-      setShowVerificationModal(true);
-      console.log("→ showVerificationModal set to true");
+      if (res.accessToken) {
+        // Token returned, create board immediately
+        try {
+          const roomId = uuid();
+          await createBoard({
+            roomId,
+            name: "Welcome Board",
+            creator: formData.username || formData.email,
+          });
+          router.push(`/board/${roomId}`);
+        } catch (error) {
+          console.error("Failed to create board after registration:", error);
+          router.push("/"); // fallback
+        }
+      } else {
+        // No token, show verification modal
+        setShowVerificationModal(true);
+        console.log("→ showVerificationModal set to true");
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Registration failed";
       console.error("→ register error:", error);
@@ -113,9 +131,24 @@ export default function RegisterForm() {
     }
   };
 
-  const handleVerificationSuccess = () => {
+  const handleVerificationSuccess = async () => {
     // User is now logged in after successful verification
-    router.push("/"); // or wherever you want to redirect
+    if (user) {
+      try {
+        const roomId = uuid();
+        await createBoard({
+          roomId,
+          name: "Welcome Board",
+          creator: user.username || user.email,
+        });
+        router.push(`/board/${roomId}`);
+      } catch (error) {
+        console.error("Failed to create board:", error);
+        router.push("/"); // fallback
+      }
+    } else {
+      router.push("/");
+    }
   };
 
   const handleModalClose = () => {
