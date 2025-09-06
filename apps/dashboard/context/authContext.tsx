@@ -46,7 +46,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   }
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3008";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3009";
 
 const ACCESS_TOKEN_STORAGE_KEY = "accessToken";
 const USER_STORAGE_KEY = "user";

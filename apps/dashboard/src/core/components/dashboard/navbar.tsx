@@ -43,7 +43,7 @@ export const Navbar = ({ boardTitle }: { boardTitle?: string }) => {
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <h1 className="text-base sm:text-lg font-semibold text-foreground truncate pr-4">
-                {boardTitle || "Dashboard"}
+                {/* {boardTitle || "Dashboard"} */}
               </h1>
             </div>
 

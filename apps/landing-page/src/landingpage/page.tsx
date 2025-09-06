@@ -38,18 +38,18 @@ export default function LandingPage() {
 
       {/* Background decorations */}
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
+        {/* <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" /> */}
         <FloatingBlob
           delay={0.1}
-          className="absolute -top-24 -left-24 h-80 w-80 rounded-full bg-primary/10 blur-3xl" 
+          className="absolute -top-24 -left-24 h-80 w-100 rounded-full bg-primary/10 blur-3xl"
         />
         <FloatingBlob
           delay={0.2}
-          className="absolute top-40 -right-20 h-96 w-96 rounded-full bg-primary/10 blur-3xl" 
+          className="absolute top-40 -right-20 h-96 w-100 rounded-full bg-primary/10 blur-3xl"
         />
         <FloatingBlob
           delay={0.3}
-          className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-primary/5 blur-3xl" 
+          className="absolute bottom-0 left-1/3 h-72 w-100 rounded-full bg-primary/5 blur-3xl"
         />
       </div>
 
@@ -114,8 +114,8 @@ export default function LandingPage() {
                 aria-label="Get Started for Free"
                 variant="default"
                 size="lg"
-                className="group relative overflow-hidden"
-                style={{ backgroundColor: "var(--primary)" }}
+                className="group relative overflow-hidden bg-chart-4"
+
               >
                 <span className="relative z-10 flex items-center">
                   Get Started Free
@@ -128,7 +128,7 @@ export default function LandingPage() {
                 <Play className="mr-2 h-4 w-4" />
                 Watch Demo
               </Button>
-             
+
             </motion.div>
 
             {/* Stats */}
@@ -159,7 +159,7 @@ export default function LandingPage() {
             transition={{ delay: 0.2, duration: 0.6 }}
           >
             <div className="relative mx-auto w-full max-w-xl">
-              <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-primary/30 to-primary/10 blur-lg" />
+              <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-primary/30 to-chart-3/10 blur-lg" />
               <div className="relative rounded-3xl border border-border bg-card/80 p-6 shadow-xl backdrop-blur">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -173,12 +173,12 @@ export default function LandingPage() {
                 {/* Fake canvas preview with animated strokes */}
                 <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-muted">
                   <motion.div
-                    className="absolute left-6 top-8 h-16 w-16 rounded-lg bg-primary/20"
+                    className="absolute left-6 top-8 h-16 w-16 rounded-lg bg-chart-4/20"
                     animate={{ x: [0, 40, 0], y: [0, 10, 0] }}
                     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                   />
                   <motion.div
-                    className="absolute bottom-10 right-8 h-24 w-24 rounded-full bg-primary/15"
+                    className="absolute bottom-10 right-8 h-24 w-24 rounded-full bg-chart-4/15"
                     animate={{ x: [0, -20, 0], y: [0, -10, 0] }}
                     transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                   />

@@ -17,6 +17,7 @@ import {
 import { useBoardStore } from '../../../../store/board-store';
 import { useAuth } from '../../../../context/authContext';
 import { NewBoardModal } from './board/new-board-modal';
+import { CanvasElement } from '../../types/board.types';
 
 interface Board {
   _id: string;
@@ -106,7 +107,7 @@ export const EmptyOrg = () => {
         <div className="mt-6">
           <button
             onClick={() => setShowNewBoardModal(true)}
-            className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center space-x-2 px-6 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
           >
             <Plus className="w-5 h-5" />
             <span>Create Your First Board</span>
@@ -130,7 +131,7 @@ export const EmptyOrg = () => {
           </div>
           <button
             onClick={() => setShowNewBoardModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center space-x-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>New Board</span>
@@ -190,6 +191,69 @@ export const EmptyOrg = () => {
   );
 };
 
+const BoardPreview: React.FC<{ elements: CanvasElement[] }> = ({ elements }) => {
+  if (!elements || elements.length === 0) {
+    return <Grid className="w-8 h-8 text-gray-400" />;
+  }
+
+  // Calculate bounds of all elements
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  elements.forEach(element => {
+    if (element.points) {
+      for (let i = 0; i < element.points.length; i += 2) {
+        minX = Math.min(minX, element.points[i]);
+        maxX = Math.max(maxX, element.points[i]);
+        minY = Math.min(minY, element.points[i + 1]);
+        maxY = Math.max(maxY, element.points[i + 1]);
+      }
+    } else {
+      minX = Math.min(minX, element.x);
+      maxX = Math.max(maxX, element.x + (element.width || 0));
+      minY = Math.min(minY, element.y);
+      maxY = Math.max(maxY, element.y + (element.height || 0));
+    }
+  });
+
+  const width = maxX - minX || 100;
+  const height = maxY - minY || 100;
+  const scale = Math.min(120 / width, 80 / height);
+
+  const renderElement = (element: CanvasElement) => {
+    const scaledX = (element.x - minX) * scale;
+    const scaledY = (element.y - minY) * scale;
+    const scaledWidth = (element.width || 0) * scale;
+    const scaledHeight = (element.height || 0) * scale;
+
+    switch (element.type) {
+      case 'line':
+        if (element.points && element.points.length >= 4) {
+          let path = `M ${((element.points[0] - minX) * scale)} ${((element.points[1] - minY) * scale)}`;
+          for (let i = 2; i < element.points.length; i += 2) {
+            path += ` L ${((element.points[i] - minX) * scale)} ${((element.points[i + 1] - minY) * scale)}`;
+          }
+          return <path key={element.id} d={path} stroke={element.color} strokeWidth={element.strokeWidth || 2} fill="none" />;
+        }
+        return null;
+      case 'rectangle':
+        return <rect key={element.id} x={scaledX} y={scaledY} width={scaledWidth} height={scaledHeight} stroke={element.color} strokeWidth={element.strokeWidth || 2} fill="none" />;
+      case 'circle':
+        const radius = Math.min(scaledWidth, scaledHeight) / 2;
+        return <circle key={element.id} cx={scaledX + radius} cy={scaledY + radius} r={radius} stroke={element.color} strokeWidth={element.strokeWidth || 2} fill="none" />;
+      case 'text':
+        return <text key={element.id} x={scaledX} y={scaledY + 12} fontSize="10" fill={element.color}>{element.text}</text>;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <svg width="120" height="80" viewBox="0 0 120 80" className="border border-gray-200 rounded">
+      <rect width="120" height="80" fill="#f8fafc" />
+      {elements.slice(0, 20).map(renderElement)}
+    </svg>
+  );
+};
+
 interface BoardCardProps {
   board: Board;
   isActive: boolean;
@@ -228,11 +292,7 @@ const BoardCard: React.FC<BoardCardProps> = ({
     >
       {/* Board Preview */}
       <div className="aspect-video bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden">
-        <Grid className="w-8 h-8 text-gray-400" />
-        {board.elements?.length > 0 && (
-
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-purple-100 opacity-80"></div>
-        )}
+        <BoardPreview elements={board.elements || []} />
         <div className="absolute bottom-2 right-2 bg-white/90 px-2 py-1 rounded-md text-xs font-medium">
           {board.elements?.length || 0} elements
         </div>
