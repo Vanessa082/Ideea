@@ -1,9 +1,9 @@
 "use client";
-
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-
+import Link from "next/link";
 export default function Navbar() {
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
   return (
     <motion.nav
       initial={{ opacity: 0, y: -20 }}
@@ -18,7 +18,6 @@ export default function Navbar() {
               Ideea
             </h1>
           </div>
-
           <div className="hidden md:flex items-center space-x-8">
             <a href="#features" className="text-foreground hover:text-primary transition-colors">
               Features
@@ -30,15 +29,11 @@ export default function Navbar() {
               Contact
             </a>
           </div>
-
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm">
-              Sign In
-            </Button>
-            <Button size="sm" style={{ backgroundColor: "var(--primary)" }}>
+          <Link href={`${dashboardUrl}`}>
+            <Button size="lg" className="bg-chart-4 hover:none">
               Get Started
             </Button>
-          </div>
+          </Link>
         </div>
       </div>
     </motion.nav>
