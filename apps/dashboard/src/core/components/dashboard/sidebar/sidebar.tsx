@@ -23,7 +23,7 @@ export const Sidebar = () => {
 
         {/* Navigation */}
         <div className="flex flex-col gap-y-4 mt-6">
-          <Link href="/dashboard">
+          <Link href="/board">
             <Button variant="ghost" size="icon" className="text-black bg-white">
               <Home size={20} />
             </Button>

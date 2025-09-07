@@ -37,7 +37,7 @@ export default function RegisterForm() {
 
   const { register, user } = useAuth();
   const router = useRouter();
-  console.log("welcome to regitration page");
+
   useEffect(() => {
     console.log("RegisterForm mounted! Client JS is running");
   }, []);
@@ -45,23 +45,14 @@ export default function RegisterForm() {
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.username.trim()) {
-      newErrors.username = "Username is required";
-    } else if (formData.username.length < 3) {
-      newErrors.username = "Username must be at least 3 characters";
-    }
+    if (!formData.username.trim()) newErrors.username = "Username is required";
+    else if (formData.username.length < 3) newErrors.username = "Username must be at least 3 characters";
 
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
-    }
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Please enter a valid email address";
 
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
+    if (!formData.password) newErrors.password = "Password is required";
+    else if (formData.password.length < 6) newErrors.password = "Password must be at least 6 characters";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -71,18 +62,12 @@ export default function RegisterForm() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Clear error when user starts typing
-    if (errors[name as keyof FormErrors]) {
-      setErrors((prev) => ({ ...prev, [name]: undefined }));
-    }
+    if (errors[name as keyof FormErrors]) setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
     setErrors({});
@@ -95,148 +80,125 @@ export default function RegisterForm() {
         ...(formData.teamName.trim() && { teamName: formData.teamName.trim() }),
       };
 
-      console.log("→ registrationData:", registrationData);
       const res = await register(registrationData);
-      console.log("→ register() resolved:", res);
 
       if (res.accessToken) {
-        // Token returned, create board immediately
-        try {
-          const roomId = uuid();
-          await createBoard({
-            roomId,
-            name: "Welcome Board",
-            creator: formData.username || formData.email,
-          });
-          router.push(`/board/${roomId}`);
-        } catch (error) {
-          console.error("Failed to create board after registration:", error);
-          router.push("/"); // fallback
-        }
+        const roomId = uuid();
+        await createBoard({ roomId, name: "Welcome Board", creator: formData.username || formData.email });
+        router.push(`/board/${roomId}`);
       } else {
-        // No token, show verification modal
         setShowVerificationModal(true);
-        console.log("→ showVerificationModal set to true");
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Registration failed";
-      console.error("→ register error:", error);
-      if (errorMessage.toLowerCase().includes("email already registered")) {
-        setErrors({ email: "This email is already registered" });
-      } else {
-        setErrors({ general: errorMessage });
-      }
+      const msg = error instanceof Error ? error.message : "Registration failed";
+      if (msg.toLowerCase().includes("email already registered")) setErrors({ email: "This email is already registered" });
+      else setErrors({ general: msg });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleVerificationSuccess = async () => {
-    // User is now logged in after successful verification
     if (user) {
       try {
         const roomId = uuid();
-        await createBoard({
-          roomId,
-          name: "Welcome Board",
-          creator: user.username || user.email,
-        });
+        await createBoard({ roomId, name: "Welcome Board", creator: user.username || user.email });
         router.push(`/board/${roomId}`);
-      } catch (error) {
-        console.error("Failed to create board:", error);
-        router.push("/"); // fallback
+      } catch {
+        router.push("/");
       }
     } else {
       router.push("/");
     }
   };
 
-  const handleModalClose = () => {
-    setShowVerificationModal(false);
-    // Optionally redirect to login page or keep them on registration
-  };
+  const handleModalClose = () => setShowVerificationModal(false);
 
   return (
     <>
-      <div className="w-full max-w-md mx-auto">
-        <h1 className="text-2xl font-semibold text-foreground text-center mb-6">
-          Create Your Account
-        </h1>
+      <div className="relative min-h-screen flex items-center justify-center bg-background overflow-hidden">
+        {/* Subtle premium blobs */}
+        <div className="absolute top-1/4 left-1/3 w-[35rem] h-[35rem] rounded-full blur-[120px] bg-[radial-gradient(1200px_600px_at_10%_-10%,_color-mix(in_oklab,_white_60%,_var(--chart-2))_0%,_transparent_60%)] opacity-30 -z-10" />
+        <div className="absolute bottom-1/4 right-1/3 w-[30rem] h-[30rem] rounded-full blur-[100px] bg-[radial-gradient(1000px_600px_at_90%_0%,_color-mix(in_oklab,_white_60%,_var(--chart-3))_0%,_transparent_55%)] opacity-20 -z-10" />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Input
-              name="username"
-              type="text"
-              placeholder="Username"
-              value={formData.username}
-              onChange={handleInputChange}
-              disabled={isSubmitting}
-              className={errors.username ? "border-destructive" : ""}
-            />
-            {errors.username && (
-              <p className="text-sm text-destructive mt-1">{errors.username}</p>
-            )}
-          </div>
+        {/* Glassmorphic card */}
+        <div className="w-full max-w-md p-10 space-y-8 bg-card/70 backdrop-blur-xl rounded-3xl border border-border shadow-md relative z-10">
+          <h1 className="text-3xl font-extrabold text-foreground text-center">Create Your Account</h1>
 
-          <div>
-            <Input
-              name="email"
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={handleInputChange}
-              disabled={isSubmitting}
-              className={errors.email ? "border-destructive" : ""}
-            />
-            {errors.email && (
-              <p className="text-sm text-destructive mt-1">{errors.email}</p>
-            )}
-          </div>
-
-          <div>
-            <Input
-              name="password"
-              type="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleInputChange}
-              disabled={isSubmitting}
-              className={errors.password ? "border-destructive" : ""}
-            />
-            {errors.password && (
-              <p className="text-sm text-destructive mt-1">{errors.password}</p>
-            )}
-          </div>
-
-          <div>
-            <Input
-              name="teamName"
-              type="text"
-              placeholder="Team Name (optional)"
-              value={formData.teamName}
-              onChange={handleInputChange}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {errors.general && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3">
-              <p className="text-sm text-destructive text-center">{errors.general}</p>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Input
+                name="username"
+                type="text"
+                placeholder="Username"
+                value={formData.username}
+                onChange={handleInputChange}
+                disabled={isSubmitting}
+                className={`rounded-lg border border-border px-4 py-3 focus:ring-2 focus:ring-primary ${errors.username ? "border-destructive" : ""}`}
+              />
+              {errors.username && <p className="text-sm text-destructive mt-1">{errors.username}</p>}
             </div>
-          )}
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Creating Account..." : "Register"}
-          </Button>
-        </form>
+            <div>
+              <Input
+                name="email"
+                type="email"
+                placeholder="Email"
+                value={formData.email}
+                onChange={handleInputChange}
+                disabled={isSubmitting}
+                className={`rounded-lg border border-border px-4 py-3 focus:ring-2 focus:ring-primary ${errors.email ? "border-destructive" : ""}`}
+              />
+              {errors.email && <p className="text-sm text-destructive mt-1">{errors.email}</p>}
+            </div>
 
-        <p className="text-sm text-muted-foreground text-center mt-4">
-          Already have an account?{" "}
-          <a href="/login" className="text-primary hover:underline">
-            Login
-          </a>
-        </p>
+            <div>
+              <Input
+                name="password"
+                type="password"
+                placeholder="Password"
+                value={formData.password}
+                onChange={handleInputChange}
+                disabled={isSubmitting}
+                className={`rounded-lg border border-border px-4 py-3 focus:ring-2 focus:ring-primary ${errors.password ? "border-destructive" : ""}`}
+              />
+              {errors.password && <p className="text-sm text-destructive mt-1">{errors.password}</p>}
+            </div>
+
+            <div>
+              <Input
+                name="teamName"
+                type="text"
+                placeholder="Team Name (optional)"
+                value={formData.teamName}
+                onChange={handleInputChange}
+                disabled={isSubmitting}
+                className="rounded-lg border border-border px-4 py-3 focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            {errors.general && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3 text-center text-sm text-destructive">
+                {errors.general}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full rounded-xl bg-gradient-to-br from-[var(--chart-2)] via-[var(--chart-3)] to-[var(--chart-1)] text-primary-foreground font-semibold shadow-sm hover:shadow-md transition"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Creating Account..." : "Register"}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-muted-foreground mt-4">
+            Already have an account?{" "}
+            <a href="/login" className="text-primary hover:underline">
+              Login
+            </a>
+          </p>
+        </div>
       </div>
 
       <EmailVerificationModal
