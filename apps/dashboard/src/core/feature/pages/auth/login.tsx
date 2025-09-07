@@ -1,4 +1,3 @@
-// core/feature/pages/auth/login.tsx
 "use client";
 
 import { useState } from "react";
@@ -99,51 +98,59 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-2 max-w-md mx-auto">
-      <h1 className="text-2xl font-semibold text-foreground text-center mb-6">
-        Welcome Back
-      </h1>
+    <div className="relative min-h-screen flex items-center justify-center bg-background overflow-hidden">
+      {/* Subtle premium blobs */}
+      <div className="absolute top-1/4 left-1/3 w-[35rem] h-[35rem] rounded-full blur-[120px] bg-[radial-gradient(1200px_600px_at_10%_-10%,_color-mix(in_oklab,_white_60%,_var(--chart-2))_0%,_transparent_60%)] opacity-30 -z-10" />
+      <div className="absolute bottom-1/4 right-1/3 w-[30rem] h-[30rem] rounded-full blur-[100px] bg-[radial-gradient(1000px_600px_at_90%_0%,_color-mix(in_oklab,_white_60%,_var(--chart-3))_0%,_transparent_55%)] opacity-20 -z-10" />
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Input
-            name="email"
-            type="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleInputChange}
-            disabled={isSubmitting}
-            className={errors.email ? "border-destructive" : ""}
-          />
-          {errors.email && (
-            <p className="text-destructive text-sm mt-1">{errors.email}</p>
+      {/* Glassmorphic card */}
+      <div className="w-full max-w-md p-10 space-y-8 bg-card/70 backdrop-blur-xl rounded-3xl border border-border shadow-md relative z-10">
+        <h1 className="text-2xl font-semibold text-foreground text-center mb-6">
+          Welcome Back
+        </h1>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Input
+              name="email"
+              type="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={handleInputChange}
+              disabled={isSubmitting}
+              className={errors.email ? "border-destructive" : ""}
+            />
+            {errors.email && (
+              <p className="text-destructive text-sm mt-1">{errors.email}</p>
+            )}
+          </div>
+
+          <div>
+            <Input
+              name="password"
+              type="password"
+              placeholder="Password"
+              value={formData.password}
+              onChange={handleInputChange}
+              disabled={isSubmitting}
+              className={errors.password ? "border-destructive" : ""}
+            />
+            {errors.password && (
+              <p className="text-destructive text-sm mt-1">{errors.password}</p>
+            )}
+          </div>
+
+          {errors.general && (
+            <p className="text-destructive text-sm mt-1">{errors.general}</p>
           )}
-        </div>
 
-        <div>
-          <Input
-            name="password"
-            type="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleInputChange}
-            disabled={isSubmitting}
-            className={errors.password ? "border-destructive" : ""}
-          />
-          {errors.password && (
-            <p className="text-destructive text-sm mt-1">{errors.password}</p>
-          )}
-        </div>
-
-        {errors.general && (
-          <p className="text-destructive text-sm mt-1">{errors.general}</p>
-        )}
-
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? "Logging in..." : "Login"}
-        </Button>
-      </form>
-      <p className="text-center">No Account? <Link href="/register">Register</Link></p>
+          <Button type="submit" className="w-full rounded-xl bg-gradient-to-br from-[var(--chart-2)] via-[var(--chart-3)] to-[var(--chart-1)] text-primary-foreground font-semibold shadow-sm hover:shadow-md transition"
+            disabled={isSubmitting}>
+            {isSubmitting ? "Logging in..." : "Login"}
+          </Button>
+        </form>
+        <p className="text-center">No Account? <Link href="/register">Register</Link></p>
+      </div>
     </div>
   );
 }

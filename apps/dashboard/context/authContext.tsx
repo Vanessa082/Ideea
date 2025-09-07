@@ -46,7 +46,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   }
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3009";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
 
 const ACCESS_TOKEN_STORAGE_KEY = "accessToken";
 const USER_STORAGE_KEY = "user";
@@ -86,11 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.message || "Registration failed");
-      }
-      if (result.accessToken && result.user) {
-        localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, result.accessToken);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(result.user));
-        dispatch({ type: "SET_USER", payload: result.user });
       }
       return { success: true, ...result };
     } catch (error) {

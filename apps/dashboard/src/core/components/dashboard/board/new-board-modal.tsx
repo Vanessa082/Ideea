@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { v4 as uuid } from "uuid";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
-import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,8 +15,6 @@ import {
 } from "../../ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "../../../../../context/authContext";
-import { createBoard } from "../../../../utils/canvasApi";
-import { useBoardStore } from "../../../../../store/board-store";
 
 interface NewBoardModalProps {
   open: boolean;
@@ -26,42 +23,35 @@ interface NewBoardModalProps {
 
 export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
   const router = useRouter();
-  const { user, logout } = useAuth();
-  const { loadUserBoards } = useBoardStore();
+  const { user } = useAuth(); // Get current user
   const [boardId, setBoardId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  const boardUrl = boardId
-    ? `${window.location.origin}/board/${boardId}`
-    : "";
+  const boardUrl = boardId ? `${window.location.origin}/board/${boardId}` : "";
 
   const handleCreate = async () => {
     if (!user || !boardName.trim()) return;
 
     setIsCreating(true);
     try {
-      const roomId = uuid();
-      await createBoard({
-        roomId,
+      const newBoardId = uuid();
+
+      // Mock board creation
+      console.log("Creating board with:", {
+        id: newBoardId,
         name: boardName.trim(),
-        creator: user.id,
+        creatorId: user.id,
       });
 
-      // Refresh boards list
-      await loadUserBoards();
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      setBoardId(roomId);
+      setBoardId(newBoardId);
       toast.success("Board created successfully!");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to create board:", error);
-      if (error.message && error.message.includes('401')) {
-        toast.error("Session expired. Please log in again.");
-        await logout();
-        router.push('/login');
-      } else {
-        toast.error("Failed to create board");
-      }
+      toast.error("Failed to create board");
     } finally {
       setIsCreating(false);
     }
@@ -73,27 +63,15 @@ export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
     toast.success("Board link copied!");
   };
 
-  const handleOpen = () => {
-    if (!boardId) {
-      setBoardName("");
-    }
-  };
-
-  const handleClose = () => {
-    setBoardId(null);
-    setBoardName("");
-    onClose();
-  };
-
   const handleOpenBoard = () => {
     if (!boardId) return;
-    handleClose();
+    onClose();
     router.push(`/board/${boardId}`);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent onOpenAutoFocus={handleOpen}>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Board</DialogTitle>
           <DialogDescription>
@@ -132,16 +110,11 @@ export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
 
         <DialogFooter>
           {!boardId ? (
-            <Button
-              onClick={handleCreate}
-              disabled={!boardName.trim() || isCreating}
-            >
+            <Button onClick={handleCreate} disabled={!boardName.trim() || isCreating}>
               {isCreating ? "Creating..." : "Create Board"}
             </Button>
           ) : (
-            <Button onClick={handleOpenBoard}>
-              Open Board
-            </Button>
+            <Button onClick={handleOpenBoard}>Open Board</Button>
           )}
         </DialogFooter>
       </DialogContent>
