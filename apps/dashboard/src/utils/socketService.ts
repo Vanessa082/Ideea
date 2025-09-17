@@ -79,6 +79,31 @@ class SocketService {
     }
   }
 
+  // Chat methods
+  joinChatRoom(roomId: string, userId: string) {
+    if (this.socket) {
+      this.socket.emit('joinRoom', { roomId, userId });
+    }
+  }
+
+  leaveChatRoom(roomId: string, userId: string) {
+    if (this.socket) {
+      this.socket.emit('leaveRoom', { roomId, userId });
+    }
+  }
+
+  onChatMessage(callback: (data: { roomId: string; event: string; data: any }) => void) {
+    if (this.socket) {
+      this.socket.on('chatMessage', callback);
+    }
+  }
+
+  offChatMessage() {
+    if (this.socket) {
+      this.socket.off('chatMessage');
+    }
+  }
+
   get socketInstance() {
     return this.socket;
   }

@@ -11,6 +11,7 @@ import socketService from "../../../../utils/socketService";
 import { UserPresence, useUserPresenceStore } from "./user-presence";
 import { Toolbar } from "./toolbar";
 import { ElementRenderer } from "./element-render";
+import { CommentsPanel } from "./comments";
 
 // Define a type for our Konva Stage and Transformer refs
 type KonvaStageRef = Konva.Stage | null;
@@ -460,9 +461,9 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
       <div className="flex-shrink-0">
         <Toolbar />
       </div>
-      
+
       {/* Canvas container - fills remaining space */}
-      <div 
+      <div
         ref={containerRef}
         className="flex-1 min-w-0 min-h-0 relative overflow-hidden"
       >
@@ -533,6 +534,11 @@ export default function BoardCanvas({ boardId }: { boardId: string }) {
             autoFocus
           />
         )}
+      </div>
+
+      {/* Comments/Chat Panel - fixed width on the right */}
+      <div className="flex-shrink-0">
+        <CommentsPanel />
       </div>
     </div>
   );
