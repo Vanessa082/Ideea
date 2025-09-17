@@ -5,7 +5,7 @@ class SocketService {
 
   connect() {
     if (!this.socket) {
-      this.socket = io('http://localhost:3007');
+      this.socket = io('http://localhost:3005');
       this.socket.on('connect', () => {
         console.log('Connected to socket server');
       });
@@ -76,6 +76,31 @@ class SocketService {
     console.log('✏️ SENDING ELEMENT UPDATE:', element.type, element.id);
     if (this.socket) {
       this.socket.emit('element:update', { boardId, element });
+    }
+  }
+
+  // Chat methods
+  joinChatRoom(roomId: string, userId: string) {
+    if (this.socket) {
+      this.socket.emit('joinRoom', { roomId, userId });
+    }
+  }
+
+  leaveChatRoom(roomId: string, userId: string) {
+    if (this.socket) {
+      this.socket.emit('leaveRoom', { roomId, userId });
+    }
+  }
+
+  onChatMessage(callback: (data: { roomId: string; event: string; data: any }) => void) {
+    if (this.socket) {
+      this.socket.on('chatMessage', callback);
+    }
+  }
+
+  offChatMessage() {
+    if (this.socket) {
+      this.socket.off('chatMessage');
     }
   }
 

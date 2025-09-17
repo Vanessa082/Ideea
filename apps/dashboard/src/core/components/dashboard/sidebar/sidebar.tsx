@@ -1,7 +1,7 @@
 "use client";
 
 import { NewButton } from "./new-button";
-import { Home, Settings, Users, Bell, LogOut } from "lucide-react";
+import { Home, Settings, Users, Bell, LogOut, MessageCircle } from "lucide-react";
 import { Button } from "../../ui/button";
 import Link from "next/link";
 import { ProtectedRoute } from "../../auth/RouteGuard";
@@ -26,6 +26,12 @@ export const Sidebar = () => {
           <Link href="/board">
             <Button variant="ghost" size="icon" className="text-black bg-white">
               <Home size={20} />
+            </Button>
+          </Link>
+
+          <Link href="/chat">
+            <Button variant="ghost" size="icon" className="text-white">
+              <MessageCircle size={20} />
             </Button>
           </Link>
 
