@@ -26,13 +26,9 @@ import {
   ChevronRight,
   Check,
 } from 'lucide-react';
+import Head from 'next/head';
+import { Button } from '@/components/ui/button';
 
-/** ---------------------------------------------------------
- * Ideea — Premium Landing (single file)
- * - OKLCH palette via CSS variables (bg-background, text-foreground, etc.)
- * - No Framer Motion; native IntersectionObserver for reveal animations
- * - Sticky glass navbar, dark mode toggle, smooth carousel/testimonials
- * -------------------------------------------------------- */
 
 type Slide = { icon: React.ComponentType<any>; title: string; description: string };
 type Testimonial = { name: string; role: string; content: string; rating: number };
@@ -41,6 +37,33 @@ const brandGradient = 'from-[var(--chart-2)] via-[var(--chart-3)] to-[var(--char
 const brandRadial =
   'bg-[radial-gradient(1200px_600px_at_10%_-10%,_color-mix(in_oklab,_white_60%,_var(--chart-2))_0%,_transparent_60%),radial-gradient(1000px_600px_at_90%_0%,_color-mix(in_oklab,_white_60%,_var(--chart-3))_0%,_transparent_55%)]';
 
+if (typeof window !== 'undefined') {
+  const id = 'ideea-gradient-keyframes';
+  if (!document.getElementById(id)) {
+    const style = document.createElement('style');
+    style.id = id;
+    style.innerHTML = `
+      @keyframes ideeaGradient {
+      0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+    }
+    .animate-ideea-gradient {
+    background-size: 200% 200%;
+    animation: ideeaGradient 14s ease infinite; /* slowed for premium feel */
+    }
+  `;
+    document.head.appendChild(style);
+  }
+}
+
+const trustedLogos = [
+  { src: '/stripe.svg', alt: 'Stripe' },
+  { src: '/vercel.svg', alt: 'Vercel' },
+  { src: '/Figma.svg', alt: 'Figma' },
+  { src: '/hashiCorp.svg', alt: 'HashiCorp' },
+];
+// keep your original slides/features/testimonials/plans unchanged
 const slides: Slide[] = [
   { icon: PencilLine, title: 'Sketch Together', description: 'Real-time whiteboarding that feels instant' },
   { icon: MessageSquare, title: 'Chat While You Create', description: 'Contextual chat anchored to shapes' },
@@ -119,6 +142,7 @@ const IdeeaLogo: React.FC<{ className?: string }> = ({ className = '' }) => (
   <div className={`flex items-center gap-3 ${className}`}>
     <div
       className={`h-9 w-9 rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10 bg-gradient-to-br ${brandGradient}`}
+      aria-hidden
     />
     <div className="leading-tight">
       <span className="text-xl font-extrabold tracking-tight">ideea</span>
@@ -139,9 +163,29 @@ const StatPill: React.FC<{ label: string; value: string }> = ({ label, value }) 
   </div>
 );
 
-const LandingPage: React.FC = () => {
+/* Subtle gradient animation CSS insertion: */
+if (typeof window !== 'undefined') {
+  const id = 'ideea-gradient-keyframes';
+  if (!document.getElementById(id)) {
+    const style = document.createElement('style');
+    style.id = id;
+    style.innerHTML = `
+      @keyframes ideeaGradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      .animate-ideea-gradient {
+        background-size: 200% 200%;
+        animation: ideeaGradient 10s ease infinite;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
 
-    const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
+const LandingPage: React.FC = () => {
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
 
   // THEME
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
@@ -158,21 +202,21 @@ const LandingPage: React.FC = () => {
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY - 80;
+    const y = el.getBoundingClientRect().top + window.scrollY - 88;
     window.scrollTo({ top: y, behavior: 'smooth' });
     setMobileOpen(false);
   };
 
-  // REVEAL ANIMATIONS
+  // REVEAL ANIMATIONS (IntersectionObserver)
   const [visible, setVisible] = useState<Set<string>>(new Set());
   useEffect(() => {
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
-          if (e.isIntersecting) setVisible((prev) => new Set(prev).add(e.target.id));
+          if (e.isIntersecting) setVisible((prev) => new Set(prev).add((e.target as HTMLElement).id));
         });
       },
-      { threshold: 0.1 },
+      { threshold: 0.12 },
     );
     document.querySelectorAll('[data-animate]').forEach((el) => io.observe(el));
     return () => io.disconnect();
@@ -183,12 +227,12 @@ const LandingPage: React.FC = () => {
   // CAROUSEL
   const [slide, setSlide] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
-  const slideRef = useRef<NodeJS.Timeout | null>(null);
+  const slideRef = useRef<number | null>(null);
   useEffect(() => {
     if (!autoPlay) return;
-    slideRef.current = setInterval(() => setSlide((s) => (s + 1) % slides.length), 4200);
+    slideRef.current = window.setInterval(() => setSlide((s) => (s + 1) % slides.length), 4200);
     return () => {
-      if (slideRef.current) clearInterval(slideRef.current);
+      if (slideRef.current) window.clearInterval(slideRef.current);
     };
   }, [autoPlay]);
 
@@ -202,533 +246,576 @@ const LandingPage: React.FC = () => {
   };
   const pause = () => {
     setAutoPlay(false);
-    setTimeout(() => setAutoPlay(true), 4000);
+    window.setTimeout(() => setAutoPlay(true), 4000);
   };
 
   // TESTIMONIALS
   const [tIndex, setTIndex] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setTIndex((i) => (i + 1) % testimonials.length), 5200);
+    const t = window.setInterval(() => setTIndex((i) => (i + 1) % testimonials.length), 5200);
     return () => clearInterval(t);
   }, []);
 
   // Derived heading split for subtle gradient emphasis
-  const heroHeading = useMemo(
-    () => ({
-      line1: 'Think visually.',
-      line2: 'Build together.',
-      line3: 'Ship faster.',
-    }),
-    [],
-  );
+  const heroHeading = useMemo(() => ({ line1: 'Think visually.', line2: 'Build together.', line3: 'Ship faster.' }), []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-[var(--chart-4)]/40 selection:text-foreground">
-      {/* NAV */}
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-card/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <IdeeaLogo />
-          <div className="hidden items-center gap-8 md:flex">
-            <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => scrollTo('features')}>
-              Features
-            </button>
-            <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => scrollTo('use-cases')}>
-              Use Cases
-            </button>
-            <button
-              className="text-sm text-muted-foreground hover:text-foreground"
-              onClick={() => scrollTo('testimonials')}
-            >
-              Testimonials
-            </button>
-            <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => scrollTo('pricing')}>
-              Pricing
-            </button>
-            <Link
-              href={`${dashboardUrl}`}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm ring-1 ring-black/5 transition hover:shadow-md bg-gradient-to-br ${brandGradient}`}
-            >
-              Get Started
-            </Link>
-            <button
-              aria-label="Toggle theme"
-              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80"
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-          </div>
-
-          {/* Mobile */}
-          <button
-            className="inline-flex items-center justify-center rounded-lg border border-border p-2 md:hidden"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={18} />
-          </button>
-        </div>
-
-        {mobileOpen && (
-          <div className="absolute inset-x-0 top-full border-b border-border bg-card/95 backdrop-blur">
-            <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-4 md:hidden">
-              <div className="flex items-center justify-between pb-2">
-                <span className="text-sm font-semibold text-muted-foreground">Menu</span>
-                <button
-                  className="inline-flex items-center justify-center rounded-lg border border-border p-2"
-                  onClick={() => setMobileOpen(false)}
-                  aria-label="Close menu"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              {['features', 'use-cases', 'testimonials', 'pricing'].map((id) => (
-                <button
-                  key={id}
-                  onClick={() => scrollTo(id)}
-                  className="rounded-lg px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
-                >
-                  {id.replace('-', ' ')}
-                </button>
-              ))}
-              <div className="flex items-center gap-3 pt-2">
-                <Link
-                  href="/auth"
-                  className={`flex-1 rounded-xl px-4 py-2 text-center text-sm font-semibold text-primary-foreground shadow-sm ring-1 ring-black/5 transition hover:shadow-md bg-gradient-to-br ${brandGradient}`}
-                >
-                  Get Started
-                </Link>
-                <button
-                  onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80"
-                >
-                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </nav>
-
-      {/* HERO */}
-      <section
-        className={`relative overflow-hidden pt-28 md:pt-32 pb-20 ${brandRadial}`}
-      >
-        {/* subtle gradient glow */}
-        <div className="pointer-events-none absolute inset-0 -z-10 opacity-60">
-          <div className="absolute left-1/2 top-[-20%] h-[50rem] w-[50rem] -translate-x-1/2 rounded-full blur-3xl opacity-20 bg-[conic-gradient(from_180deg,var(--chart-1),var(--chart-2),var(--chart-3))]" />
-        </div>
-
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 md:grid-cols-2 md:gap-16">
-          <div id="hero-text" data-animate className={show('hero-text')}>
-            <Badge>
-              <Zap size={14} />
-              Real-time Collaboration Platform
-            </Badge>
-
-            <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
-              <span className="block">ideea</span>
-              <span className={`block bg-gradient-to-r ${brandGradient} bg-clip-text text-transparent`}>
-                {heroHeading.line1}
-              </span>
-              <span className="block">{heroHeading.line2}</span>
-              <span className="block text-muted-foreground">{heroHeading.line3}</span>
-            </h1>
-
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
-              The all-in-one creative hub where teams sketch, discuss, and ship ideas. Lightning-fast presence,
-              precision tools, and sharing that just works.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/auth"
-                className={`group inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:shadow-md bg-gradient-to-br ${brandGradient}`}
+    <>
+      <Head>
+        <title>ideea — Visual Collaboration Platform</title>
+        <meta name="description" content="ideea is the premium real-time collaboration platform for high-velocity teams." />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <html lang="en" />
+        {/* JSON-LD structured data */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: 'ideea',
+            url: 'https://ideea.com',
+            logo: 'https://ideea.com/logo.png',
+            sameAs: ['https://twitter.com/ideea', 'https://linkedin.com/company/ideea']
+          })
+        }} />
+      </Head>
+      <div className="min-h-screen bg-background text-foreground selection:bg-[var(--chart-4)]/40 selection:text-foreground">
+        {/* NAV */}
+        <nav className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-card/70 backdrop-blur-md">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+            <IdeeaLogo />
+            <div className="hidden items-center gap-8 md:flex">
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => scrollTo('features')}
+                aria-label="Scroll to features"
               >
-                Start free <ArrowIcon />
-              </Link>
-              <button className="inline-flex items-center justify-center rounded-xl border border-border bg-secondary px-5 py-3 text-sm font-semibold hover:bg-secondary/80">
-                <Play size={16} className="mr-2" />
-                Watch demo (2 min)
+                Features
               </button>
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => scrollTo('use-cases')}
+                aria-label="Scroll to use cases"
+              >
+                Use Cases
+              </button>
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => scrollTo('testimonials')}
+                aria-label="Scroll to testimonials"
+              >
+                Testimonials
+              </button>
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => scrollTo('pricing')}
+                aria-label="Scroll to pricing"
+              >
+                Pricing
+              </button>
+              <Link
+                href={`${dashboardUrl}`}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm ring-1 ring-black/5 transition hover:shadow-md bg-gradient-to-br ${brandGradient}`}
+                aria-label="Get started"
+              >
+                Get Started
+              </Link>
+              <Button
+                aria-label="Toggle theme"
+                onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80"
+              >
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </Button>
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <StatPill value="60K+" label="Active Users" />
-              <StatPill value="1.3M+" label="Boards Created" />
-              <StatPill value="99.99%" label="Uptime" />
-              <StatPill value="SOC2" label="Type II" />
-            </div>
+            {/* Mobile */}
+            <button
+              className="inline-flex items-center justify-center rounded-lg border border-border p-2 md:hidden"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={18} />
+            </button>
           </div>
 
-          {/* Carousel */}
-          <div
-            id="hero-carousel"
-            data-animate
-            className={`${show('hero-carousel')}`}
-          >
+          {mobileOpen && (
+            <div className="absolute inset-x-0 top-full border-b border-border bg-card/95 backdrop-blur">
+              <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-4 md:hidden">
+                <div className="flex items-center justify-between pb-2">
+                  <span className="text-sm font-semibold text-muted-foreground">Menu</span>
+                  <Button
+                    className="inline-flex items-center justify-center rounded-lg border border-border p-2"
+                    onClick={() => setMobileOpen(false)}
+                    aria-label="Close menu"
+                  >
+                    <X size={18} />
+                  </Button>
+                </div>
+                {['features', 'use-cases', 'testimonials', 'pricing'].map((id) => (
+                  <Button
+                    key={id}
+                    onClick={() => scrollTo(id)}
+                    className="rounded-lg px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  >
+                    {id.replace('-', ' ')}
+                  </Button>
+                ))}
+                <div className="flex items-center gap-3 pt-2">
+                  <Link
+                    href="dashboardUrl"
+                    className={`flex-1 rounded-xl px-4 py-2 text-center text-sm font-semibold text-primary-foreground shadow-sm ring-1 ring-black/5 transition hover:shadow-md bg-gradient-to-br ${brandGradient}`}
+                  >
+                    Get Started
+                  </Link>
+                  <Button
+                    onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80"
+                  >
+                    {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </nav>
+
+        {/* HERO */}
+        <section
+          className={`relative overflow-hidden pt-28 md:pt-32 pb-20 ${brandRadial}`}
+          aria-labelledby="hero-heading"
+        >
+          {/* subtle gradient glow + animated gradient band */}
+          <div className="pointer-events-none absolute inset-0 -z-10 opacity-60">
+            <div className="absolute left-1/2 top-[-20%] h-[50rem] w-[50rem] -translate-x-1/2 rounded-full blur-3xl opacity-20 bg-[conic-gradient(from_180deg,var(--chart-1),var(--chart-2),var(--chart-3))]" />
+          </div>
+
+          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 md:grid-cols-2 md:gap-16">
+            <div id="hero-text" data-animate className={show('hero-text')}>
+              <Badge>
+                <Zap size={14} />
+                Real-time Collaboration Platform
+              </Badge>
+
+              <h1 id="hero-heading" className="mt-5 text-4xl font-extrabold leading-[1.03] tracking-tight md:text-6xl lg:text-7xl">
+                <span className="block">ideea</span>
+                <span
+                  className={`block bg-gradient-to-r ${brandGradient} bg-clip-text text-transparent animate-ideea-gradient`}
+                  aria-hidden
+                >
+                  {heroHeading.line1}
+                </span>
+                <span className="block">{heroHeading.line2}</span>
+                <span className="block text-muted-foreground">{heroHeading.line3}</span>
+              </h1>
+
+              <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
+                The all-in-one creative hub where teams sketch, discuss, and ship ideas. Lightning-fast presence,
+                precision tools, and sharing that just works.
+              </p>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="dashboardUrl"
+                  className={`group inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition transform-gpu will-change-transform hover:-translate-y-0.5 bg-gradient-to-br ${brandGradient}`}
+                  aria-label="Start free"
+                >
+                  Start free <span className="ml-2"><ChevronRight size={14} /></span>
+                </Link>
+
+                <button
+                  className="inline-flex items-center justify-center rounded-xl border border-border bg-secondary px-5 py-3 text-sm font-semibold hover:bg-secondary/80"
+                  onClick={() => {
+                    const demo = document.getElementById('hero-carousel');
+                    if (demo) demo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  aria-label="Watch demo"
+                >
+                  <Play size={16} className="mr-2" />
+                  Watch demo (2 min)
+                </button>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <StatPill value="60K+" label="Active Users" />
+                <StatPill value="1.3M+" label="Boards Created" />
+                <StatPill value="99.99%" label="Uptime" />
+                <StatPill value="SOC2" label="Type II" />
+              </div>
+            </div>
+
+            {/* Carousel */}
+            <div id="hero-carousel" data-animate className={`${show('hero-carousel')}`}>
+              <div
+                className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-lg"
+                onMouseEnter={() => setAutoPlay(false)}
+                onMouseLeave={() => setAutoPlay(true)}
+                role="region"
+                aria-label="Feature carousel"
+              >
+                <div
+                  className="flex transition-transform duration-700 ease-in-out"
+                  style={{ transform: `translateX(-${slide * 100}%)` }}
+                >
+                  {slides.map((s, i) => {
+                    const Icon = s.icon;
+                    return (
+                      <div key={i} className="w-full flex-shrink-0">
+                        <div
+                          className={`relative flex h-80 items-center justify-center overflow-hidden bg-gradient-to-br ${brandGradient}`}
+                        >
+                          <div className="absolute inset-0 bg-black/8 dark:bg-black/20" />
+                          <div className="relative z-10 text-center text-primary-foreground max-w-[85%]">
+                            <Icon className="mx-auto mb-4 h-14 w-14" />
+                            <h3 className="mb-1 text-2xl font-bold">{s.title}</h3>
+                            <p className="text-sm/6 opacity-90">{s.description}</p>
+                          </div>
+
+                          {/* subtle animated orbs (small, lightweight) */}
+                          <div className="absolute right-6 top-4 h-14 w-14 rounded-full blur-sm opacity-40 bg-white/10" />
+                          <div className="absolute left-8 bottom-8 h-10 w-10 rounded-full blur-sm opacity-25 bg-white/6" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Controls */}
+                <Button
+                  onClick={prev}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-border bg-card/80 p-2 shadow-sm backdrop-blur hover:bg-card"
+                  aria-label="Previous slide"
+                >
+                  <ChevronLeft size={18} />
+                </Button>
+                <Button
+                  onClick={next}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-border bg-card/80 p-2 shadow-sm backdrop-blur hover:bg-card"
+                  aria-label="Next slide"
+                >
+                  <ChevronRight size={18} />
+                </Button>
+
+                {/* Dots */}
+                <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
+                  {slides.map((_, i) => (
+                    <Button
+                      key={i}
+                      onClick={() => setSlide(i)}
+                      className={`h-2.5 w-2.5 rounded-full transition ${i === slide ? 'bg-white' : 'bg-white/50 hover:bg-white/80'}`}
+                      aria-label={`Go to slide ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Trusted logos strip */}
+        <section className="mx-auto max-w-7xl px-5 py-6">
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-6 text-sm text-muted-foreground">
+            <div className="opacity-90">Trusted by</div>
+            <div className="flex flex-wrap items-center gap-6 justify-end">
+              {trustedLogos.map((logo) => (
+                <img
+                  key={logo.alt}
+                  src={logo.src}
+                  alt={logo.alt}
+                  className="h-8 opacity-70 grayscale hover:grayscale-0 hover:opacity-100 transition"
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* FEATURES */}
+        <section id="features" className="py-24">
+          <div className="mx-auto max-w-7xl px-5">
+            <div id="features-head" data-animate className={`mb-14 text-center ${show('features-head')}`}>
+              <h2 className="text-3xl font-extrabold md:text-4xl">Built for modern, high-velocity teams</h2>
+              <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
+                From workshops to wireframes—ideea adapts to your canvas and your cadence.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {features.map((f, i) => {
+                const Icon = f.icon;
+                return (
+                  <div
+                    key={i}
+                    id={`feature-${i}`}
+                    data-animate
+                    className={`${show(`feature-${i}`)} rounded-2xl border border-border bg-card p-6 transition hover:-translate-y-1.5 hover:shadow-lg`}
+                    style={{ transitionDelay: `${i * 90}ms` }}
+                  >
+                    <div className={`mb-4 inline-flex rounded-xl border border-border bg-secondary p-3`}>
+                      <Icon size={18} />
+                    </div>
+                    <h3 className="text-lg font-semibold">{f.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* USE CASES */}
+        <section id="use-cases" className="border-y border-border py-24">
+          <div className="mx-auto max-w-7xl px-5">
+            <div id="use-head" data-animate className={`mb-12 ${show('use-head')}`}>
+              <h2 className="text-3xl font-extrabold md:text-4xl">One tool — endless ways to ideate</h2>
+              <p className="mt-3 max-w-2xl text-muted-foreground">
+                Design reviews, systems diagrams, sprint planning, research synthesis, classrooms, and more.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+              {[
+                { title: 'Design Teams', desc: 'Wireframes, flows, and component audits', icon: Shapes },
+                { title: 'Engineering', desc: 'Architecture, incident maps, RFC reviews', icon: Zap },
+                { title: 'Marketing', desc: 'Campaign storyboards, content mapping', icon: Users },
+                { title: 'Education', desc: 'Workshops, lessons, async feedback', icon: MessageSquare },
+              ].map((c, i) => {
+                const Icon = c.icon;
+                return (
+                  <div
+                    key={i}
+                    id={`use-${i}`}
+                    data-animate
+                    className={`${show(`use-${i}`)} group rounded-2xl border border-border bg-card p-6 transition hover:shadow-md`}
+                    style={{ transitionDelay: `${i * 100}ms` }}
+                  >
+                    <div
+                      className={`mb-4 inline-flex rounded-xl p-3 text-primary-foreground shadow ring-1 ring-black/5 bg-gradient-to-br ${brandGradient}`}
+                    >
+                      <Icon size={18} />
+                    </div>
+                    <h3 className="text-base font-semibold">{c.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">{c.desc}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* TESTIMONIALS */}
+        <section id="testimonials" className="py-24">
+          <div className="mx-auto max-w-5xl px-5">
+            <div id="t-head" data-animate className={`mb-12 text-center ${show('t-head')}`}>
+              <h2 className="text-3xl font-extrabold md:text-4xl">Loved by teams worldwide</h2>
+              <p className="mt-3 text-muted-foreground">Real stories from people moving faster with ideea.</p>
+            </div>
+
             <div
-              className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-lg"
-              onMouseEnter={() => setAutoPlay(false)}
-              onMouseLeave={() => setAutoPlay(true)}
+              id="t-wrap"
+              data-animate
+              className={`${show('t-wrap')} relative overflow-hidden rounded-3xl border border-border bg-card p-10 shadow-md`}
             >
+              <div className="absolute inset-0 pointer-events-none opacity-10">
+                <Quote className="absolute -left-2 -top-2 h-24 w-24" />
+                <Quote className="absolute -bottom-2 -right-2 h-24 w-24 rotate-180" />
+              </div>
+
               <div
                 className="flex transition-transform duration-700 ease-in-out"
-                style={{ transform: `translateX(-${slide * 100}%)` }}
+                style={{ transform: `translateX(-${tIndex * 100}%)` }}
               >
-                {slides.map((s, i) => {
-                  const Icon = s.icon;
-                  return (
-                    <div key={i} className="w-full flex-shrink-0">
-                      <div
-                        className={`relative flex h-80 items-center justify-center overflow-hidden bg-gradient-to-br ${brandGradient}`}
-                      >
-                        <div className="absolute inset-0 bg-black/10 dark:bg-black/20" />
-                        <div className="relative z-10 text-center text-primary-foreground">
-                          <Icon className="mx-auto mb-4 h-14 w-14 animate-pulse" />
-                          <h3 className="mb-1 text-2xl font-bold">{s.title}</h3>
-                          <p className="text-sm/6 opacity-90">{s.description}</p>
-                        </div>
-
-                        {/* subtle animated orbs */}
-                        <div className="absolute right-6 top-4 h-14 w-14 animate-bounce rounded-full bg-white/15 blur-[1px]" />
-                        <div
-                          className="absolute left-8 bottom-8 h-10 w-10 animate-pulse rounded-full bg-white/10"
-                          style={{ animationDelay: '600ms' }}
-                        />
-                      </div>
+                {testimonials.map((t, i) => (
+                  <div key={i} className="w-full flex-shrink-0 text-center">
+                    <blockquote className="mx-auto max-w-2xl text-lg leading-relaxed">
+                      “{t.content}”
+                    </blockquote>
+                    <div className="mt-6 flex justify-center gap-1">
+                      {Array.from({ length: t.rating }).map((_, s) => (
+                        <Star key={s} className="h-4 w-4 fill-current" />
+                      ))}
                     </div>
-                  );
-                })}
+                    <div className="mt-3 text-sm font-semibold">{t.name}</div>
+                    <div className="text-xs text-muted-foreground">{t.role}</div>
+                  </div>
+                ))}
               </div>
 
-              {/* Controls */}
-              <button
-                onClick={prev}
-                className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-border bg-card/80 p-2 shadow-sm backdrop-blur hover:bg-card"
-                aria-label="Previous"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                onClick={next}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-border bg-card/80 p-2 shadow-sm backdrop-blur hover:bg-card"
-                aria-label="Next"
-              >
-                <ChevronRight size={18} />
-              </button>
-
-              {/* Dots */}
-              <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
-                {slides.map((_, i) => (
-                  <button
+              <div className="mt-6 flex justify-center gap-2">
+                {testimonials.map((_, i) => (
+                  <Button
                     key={i}
-                    onClick={() => setSlide(i)}
-                    className={`h-2.5 w-2.5 rounded-full transition ${
-                      i === slide ? 'bg-white' : 'bg-white/50 hover:bg-white/80'
-                    }`}
-                    aria-label={`Go to slide ${i + 1}`}
+                    onClick={() => setTIndex(i)}
+                    className={`h-2.5 w-2.5 rounded-full transition ${i === tIndex ? 'bg-foreground' : 'bg-muted'}`}
+                    aria-label={`Go to testimonial ${i + 1}`}
                   />
                 ))}
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* FEATURES */}
-      <section id="features" className="py-24">
-        <div className="mx-auto max-w-7xl px-5">
-          <div id="features-head" data-animate className={`mb-14 text-center ${show('features-head')}`}>
-            <h2 className="text-3xl font-extrabold md:text-4xl">Built for modern, high-velocity teams</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-              From workshops to wireframes—ideea adapts to your canvas and your cadence.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((f, i) => {
-              const Icon = f.icon;
-              return (
-                <div
-                  key={i}
-                  id={`feature-${i}`}
-                  data-animate
-                  className={`${show(`feature-${i}`)} rounded-2xl border border-border bg-card p-6 transition hover:shadow-md`}
-                  style={{ transitionDelay: `${i * 90}ms` }}
-                >
-                  <div className={`mb-4 inline-flex rounded-xl border border-border bg-secondary p-3`}>
-                    <Icon size={18} />
-                  </div>
-                  <h3 className="text-lg font-semibold">{f.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* USE CASES */}
-      <section id="use-cases" className="border-y border-border py-24">
-        <div className="mx-auto max-w-7xl px-5">
-          <div id="use-head" data-animate className={`mb-12 ${show('use-head')}`}>
-            <h2 className="text-3xl font-extrabold md:text-4xl">One tool — endless ways to ideate</h2>
-            <p className="mt-3 max-w-2xl text-muted-foreground">
-              Design reviews, systems diagrams, sprint planning, research synthesis, classrooms, and more.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
-            {[
-              { title: 'Design Teams', desc: 'Wireframes, flows, and component audits', icon: Shapes },
-              { title: 'Engineering', desc: 'Architecture, incident maps, RFC reviews', icon: Zap },
-              { title: 'Marketing', desc: 'Campaign storyboards, content mapping', icon: Users },
-              { title: 'Education', desc: 'Workshops, lessons, async feedback', icon: MessageSquare },
-            ].map((c, i) => {
-              const Icon = c.icon;
-              return (
-                <div
-                  key={i}
-                  id={`use-${i}`}
-                  data-animate
-                  className={`${show(`use-${i}`)} group rounded-2xl border border-border bg-card p-6 transition hover:shadow-md`}
-                  style={{ transitionDelay: `${i * 100}ms` }}
-                >
-                  <div
-                    className={`mb-4 inline-flex rounded-xl p-3 text-primary-foreground shadow ring-1 ring-black/5 bg-gradient-to-br ${brandGradient}`}
-                  >
-                    <Icon size={18} />
-                  </div>
-                  <h3 className="text-base font-semibold">{c.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{c.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS */}
-      <section id="testimonials" className="py-24">
-        <div className="mx-auto max-w-5xl px-5">
-          <div id="t-head" data-animate className={`mb-12 text-center ${show('t-head')}`}>
-            <h2 className="text-3xl font-extrabold md:text-4xl">Loved by teams worldwide</h2>
-            <p className="mt-3 text-muted-foreground">Real stories from people moving faster with ideea.</p>
-          </div>
-
-          <div
-            id="t-wrap"
-            data-animate
-            className={`${show('t-wrap')} relative overflow-hidden rounded-3xl border border-border bg-card p-10 shadow-md`}
-          >
-            <div className="absolute inset-0 pointer-events-none opacity-10">
-              <Quote className="absolute -left-2 -top-2 h-24 w-24" />
-              <Quote className="absolute -bottom-2 -right-2 h-24 w-24 rotate-180" />
+        {/* PRICING */}
+        <section id="pricing" className="border-t border-border py-24">
+          <div className="mx-auto max-w-7xl px-5">
+            <div id="p-head" data-animate className={`mb-12 text-center ${show('p-head')}`}>
+              <h2 className="text-3xl font-extrabold md:text-4xl">Simple, transparent pricing</h2>
+              <p className="mt-3 text-muted-foreground">Choose the plan that matches your team’s momentum.</p>
             </div>
 
-            <div
-              className="flex transition-transform duration-700 ease-in-out"
-              style={{ transform: `translateX(-${tIndex * 100}%)` }}
-            >
-              {testimonials.map((t, i) => (
-                <div key={i} className="w-full flex-shrink-0 text-center">
-                  <blockquote className="mx-auto max-w-2xl text-lg leading-relaxed">
-                    “{t.content}”
-                  </blockquote>
-                  <div className="mt-6 flex justify-center gap-1">
-                    {Array.from({ length: t.rating }).map((_, s) => (
-                      <Star key={s} className="h-4 w-4 fill-current" />
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              {plans.map((p, i) => (
+                <div
+                  key={i}
+                  id={`plan-${i}`}
+                  data-animate
+                  className={`${show(`plan-${i}`)} relative rounded-3xl border border-border bg-card p-8 shadow-sm transition hover:shadow-md`}
+                  style={{ transitionDelay: `${i * 120}ms` }}
+                >
+                  {p.popular && (
+                    <div
+                      className={`absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-bold text-primary-foreground shadow ring-1 ring-black/5 bg-gradient-to-br ${brandGradient}`}
+                    >
+                      Most Popular
+                    </div>
+                  )}
+                  <h3 className="text-lg font-semibold">{p.name}</h3>
+                  <div className="mt-3 flex items-end gap-2">
+                    <span className={`text-4xl font-extrabold ${p.price === 'Custom' ? 'text-3xl' : ''}`}>{p.price}</span>
+                    <span className="pb-1 text-sm text-muted-foreground">{p.period}</span>
+                  </div>
+
+                  <ul className="mt-6 space-y-3 text-sm">
+                    {p.features.map((f: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <Check className="mt-0.5 h-4 w-4" />
+                        <span>{f}</span>
+                      </li>
                     ))}
-                  </div>
-                  <div className="mt-3 text-sm font-semibold">{t.name}</div>
-                  <div className="text-xs text-muted-foreground">{t.role}</div>
-                </div>
-              ))}
-            </div>
+                  </ul>
 
-            <div className="mt-6 flex justify-center gap-2">
-              {testimonials.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setTIndex(i)}
-                  className={`h-2.5 w-2.5 rounded-full transition ${i === tIndex ? 'bg-foreground' : 'bg-muted'}`}
-                  aria-label={`Go to testimonial ${i + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section id="pricing" className="border-t border-border py-24">
-        <div className="mx-auto max-w-7xl px-5">
-          <div id="p-head" data-animate className={`mb-12 text-center ${show('p-head')}`}>
-            <h2 className="text-3xl font-extrabold md:text-4xl">Simple, transparent pricing</h2>
-            <p className="mt-3 text-muted-foreground">Choose the plan that matches your team’s momentum.</p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {plans.map((p, i) => (
-              <div
-                key={i}
-                id={`plan-${i}`}
-                data-animate
-                className={`${show(`plan-${i}`)} relative rounded-3xl border border-border bg-card p-8 shadow-sm transition hover:shadow-md`}
-                style={{ transitionDelay: `${i * 120}ms` }}
-              >
-                {p.popular && (
-                  <div
-                    className={`absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-bold text-primary-foreground shadow ring-1 ring-black/5 bg-gradient-to-br ${brandGradient}`}
-                  >
-                    Most Popular
-                  </div>
-                )}
-                <h3 className="text-lg font-semibold">{p.name}</h3>
-                <div className="mt-3 flex items-end gap-2">
-                  <span className={`text-4xl font-extrabold ${p.price === 'Custom' ? 'text-3xl' : ''}`}>{p.price}</span>
-                  <span className="pb-1 text-sm text-muted-foreground">{p.period}</span>
-                </div>
-
-                <ul className="mt-6 space-y-3 text-sm">
-                  {p.features.map((f: string, idx: number) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  className={`mt-8 w-full rounded-xl px-4 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/5 transition ${
-                    p.popular
+                  <Button
+                    className={`mt-8 w-full rounded-xl px-4 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/5 transition ${p.popular
                       ? `text-primary-foreground hover:shadow-md bg-gradient-to-br ${brandGradient}`
                       : 'border border-border bg-secondary hover:bg-secondary/80'
-                  }`}
-                >
-                  {p.cta}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="relative overflow-hidden py-20">
-        <div className="pointer-events-none absolute inset-0 -z-10 opacity-40">
-          <div className="absolute left-1/2 top-0 h-[44rem] w-[44rem] -translate-x-1/2 rounded-full blur-3xl opacity-25 bg-[conic-gradient(from_90deg,var(--chart-3),var(--chart-5),var(--chart-2))]" />
-        </div>
-        <div className="mx-auto max-w-5xl px-5">
-          <div
-            id="cta"
-            data-animate
-            className={`${show('cta')} rounded-3xl border border-border bg-card p-8 text-center shadow-md md:p-12`}
-          >
-            <h3 className="text-2xl font-extrabold md:text-3xl">Ready to bring your ideas to life?</h3>
-            <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
-              Join thousands of teams using ideea to collaborate visually and move work forward.
-            </p>
-            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-              <Link
-                href="/auth"
-                className={`group inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:shadow-md bg-gradient-to-br ${brandGradient}`}
-              >
-                Start your free workspace <ArrowIcon />
-              </Link>
-              <button className="inline-flex items-center justify-center rounded-xl border border-border bg-secondary px-5 py-3 text-sm font-semibold hover:bg-secondary/80">
-                Talk to sales
-              </button>
+                      }`}
+                  >
+                    {p.cta}
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* FOOTER */}
-      <footer className="border-t border-border bg-card py-14">
-        <div className="mx-auto max-w-7xl px-5">
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
-            <div className="lg:col-span-2">
-              <IdeeaLogo />
-              <p className="mt-4 max-w-md text-sm text-muted-foreground">
-                ideea is the canvas for teams to visualize thinking, align fast, and execute together—without tool
-                friction.
+        {/* CTA */}
+        <section className="relative overflow-hidden py-20">
+          <div className="pointer-events-none absolute inset-0 -z-10 opacity-40">
+            <div className="absolute left-1/2 top-0 h-[44rem] w-[44rem] -translate-x-1/2 rounded-full blur-3xl opacity-25 bg-[conic-gradient(from_90deg,var(--chart-3),var(--chart-5),var(--chart-2))]" />
+          </div>
+          <div className="mx-auto max-w-5xl px-5">
+            <div
+              id="cta"
+              data-animate
+              className={`${show('cta')} rounded-3xl border border-border bg-card p-8 text-center shadow-md md:p-12`}
+            >
+              <h3 className="text-2xl font-extrabold md:text-3xl">Ready to bring your ideas to life?</h3>
+              <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
+                Join thousands of teams using ideea to collaborate visually and move work forward.
               </p>
-              <div className="mt-5 flex gap-3">
-                <a
-                  href="#"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-secondary"
+              <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                <Link
+                  href="dashboardUrl"
+                  className={`group inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:shadow-md bg-gradient-to-br ${brandGradient}`}
                 >
-                  <Github size={18} />
-                </a>
-                <a
-                  href="#"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-secondary"
-                >
-                  <Twitter size={18} />
-                </a>
-                <a
-                  href="#"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-secondary"
-                >
-                  <Linkedin size={18} />
-                </a>
+                  Start your free workspace <span className="ml-2"><ChevronRight size={16} /></span>
+                </Link>
+                <Button className="inline-flex items-center justify-center rounded-xl border border-border bg-secondary px-5 py-3 text-sm font-semibold hover:bg-secondary/80">
+                  Talk to sales
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FOOTER */}
+        <footer className="border-t border-border bg-card py-14">
+          <div className="mx-auto max-w-7xl px-5">
+            <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
+              <div className="lg:col-span-2">
+                <IdeeaLogo />
+                <p className="mt-4 max-w-md text-sm text-muted-foreground">
+                  ideea is the canvas for teams to visualize thinking, align fast, and execute together—without tool
+                  friction.
+                </p>
+                <div className="mt-5 flex gap-3">
+                  <a
+                    href="#"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-secondary"
+                  >
+                    <Github size={18} />
+                  </a>
+                  <a
+                    href="#"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-secondary"
+                  >
+                    <Twitter size={18} />
+                  </a>
+                  <a
+                    href="#"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-secondary"
+                  >
+                    <Linkedin size={18} />
+                  </a>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold">Product</div>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  <li><Link className="hover:text-foreground" href="#">Features</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Use Cases</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Pricing</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Roadmap</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Changelog</Link></li>
+                </ul>
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold">Resources</div>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  <li><Link className="hover:text-foreground" href="#">Documentation</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Tutorials</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Blog</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Community</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Support</Link></li>
+                </ul>
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold">Company</div>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  <li><Link className="hover:text-foreground" href="#">About</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Careers</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Contact</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Partners</Link></li>
+                  <li><Link className="hover:text-foreground" href="#">Press</Link></li>
+                </ul>
               </div>
             </div>
 
-            <div>
-              <div className="text-sm font-semibold">Product</div>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li><a className="hover:text-foreground" href="#">Features</a></li>
-                <li><a className="hover:text-foreground" href="#">Use Cases</a></li>
-                <li><a className="hover:text-foreground" href="#">Pricing</a></li>
-                <li><a className="hover:text-foreground" href="#">Roadmap</a></li>
-                <li><a className="hover:text-foreground" href="#">Changelog</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <div className="text-sm font-semibold">Resources</div>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li><a className="hover:text-foreground" href="#">Documentation</a></li>
-                <li><a className="hover:text-foreground" href="#">Tutorials</a></li>
-                <li><a className="hover:text-foreground" href="#">Blog</a></li>
-                <li><a className="hover:text-foreground" href="#">Community</a></li>
-                <li><a className="hover:text-foreground" href="#">Support</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <div className="text-sm font-semibold">Company</div>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li><a className="hover:text-foreground" href="#">About</a></li>
-                <li><a className="hover:text-foreground" href="#">Careers</a></li>
-                <li><a className="hover:text-foreground" href="#">Contact</a></li>
-                <li><a className="hover:text-foreground" href="#">Partners</a></li>
-                <li><a className="hover:text-foreground" href="#">Press</a></li>
-              </ul>
+            <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 text-xs text-muted-foreground md:flex-row">
+              <div>&copy; {new Date().getFullYear()} ideea, Inc. All rights reserved.</div>
+              <div className="flex gap-4">
+                <Link href="#" className="hover:text-foreground">Privacy Policy</Link>
+                <Link href="#" className="hover:text-foreground">Terms of Service</Link>
+                <Link href="#" className="hover:text-foreground">Cookie Policy</Link>
+              </div>
             </div>
           </div>
-
-          <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 text-xs text-muted-foreground md:flex-row">
-            <div>&copy; {new Date().getFullYear()} ideea, Inc. All rights reserved.</div>
-            <div className="flex gap-4">
-              <a href="#" className="hover:text-foreground">Privacy Policy</a>
-              <a href="#" className="hover:text-foreground">Terms of Service</a>
-              <a href="#" className="hover:text-foreground">Cookie Policy</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </>
   );
 };
 
-const ArrowIcon = () => (
-  <span className="ml-2 inline-flex items-center transition-transform group-hover:translate-x-0.5">
-    <ChevronRight size={16} />
-  </span>
-);
-
 export default LandingPage;
+

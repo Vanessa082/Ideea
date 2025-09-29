@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../context/authContext";
+import { useAuth } from "@/core/hook/auth-context";
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">

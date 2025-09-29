@@ -1,8 +1,8 @@
 "use client";
 
+import { useAuth } from "@/core/hook/auth-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useAuth } from "../../../../context/authContext";
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">

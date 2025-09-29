@@ -1,211 +1,112 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { v4 as uuid } from "uuid";
 import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
-import EmailVerificationModal from "@/core/components/auth/verificationModal";
-import { useAuth } from "../../../../../context/authContext";
-import { createBoard } from "../../../../utils/canvasApi";
-
-interface FormData {
-  username: string;
-  email: string;
-  password: string;
-  teamName: string;
-}
-
-interface FormErrors {
-  username?: string;
-  email?: string;
-  password?: string;
-  general?: string;
-}
+import Link from "next/link";
+import EmailVerificationDialog from "./EmailVerificationModal";
+import { useAuth } from "@/core/hook/auth-context";
 
 export default function RegisterForm() {
-  const [formData, setFormData] = useState<FormData>({
-    username: "",
-    email: "",
-    password: "",
-    teamName: "",
-  });
-
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [formData, setFormData] = useState({ username: "", email: "", password: "", teamName: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
 
-  const { register, user } = useAuth();
+  const [registeredEmail, setRegisteredEmail] = useState("");
+  const { register } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    console.log("RegisterForm mounted! Client JS is running");
-  }, []);
-
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.username.trim()) newErrors.username = "Username is required";
-    else if (formData.username.length < 3) newErrors.username = "Username must be at least 3 characters";
-
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Please enter a valid email address";
-
-    if (!formData.password) newErrors.password = "Password is required";
-    else if (formData.password.length < 6) newErrors.password = "Password must be at least 6 characters";
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const validateForm = () => {
+    const e: Record<string, string> = {};
+    if (!formData.username.trim()) e.username = "Username is required";
+    else if (formData.username.length < 3) e.username = "Username must be at least 3 characters";
+    if (!formData.email.trim()) e.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) e.email = "Please enter a valid email address";
+    if (!formData.password) e.password = "Password is required";
+    else if (formData.password.length < 6) e.password = "Password must be at least 6 characters";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-
-    if (errors[name as keyof FormErrors]) setErrors((prev) => ({ ...prev, [name]: undefined }));
+    setFormData((p) => ({ ...p, [name]: value }));
+    if (errors[name]) setErrors((p) => ({ ...p, [name]: "" }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-
     setIsSubmitting(true);
     setErrors({});
 
     try {
-      const registrationData = {
+      const payload = {
         username: formData.username.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         ...(formData.teamName.trim() && { teamName: formData.teamName.trim() }),
       };
 
-      const res = await register(registrationData);
+      const res = await register(payload);
 
       if (res.accessToken) {
-        const roomId = uuid();
-        await createBoard({ roomId, name: "Welcome Board", creator: formData.username || formData.email });
-        router.push(`/board/${roomId}`);
+        localStorage.setItem("token", res.accessToken);
+        const inviteRedirectUrl = localStorage.getItem("inviteRedirectUrl");
+        if (inviteRedirectUrl) {
+          localStorage.removeItem("inviteRedirectUrl"); // Clean up
+          router.push(inviteRedirectUrl);
+        } else {
+          router.push("/board"); // Default redirection
+        }
       } else {
+        setRegisteredEmail(formData.email.trim().toLowerCase());
         setShowVerificationModal(true);
       }
-    } catch (error) {
+    } catch (error: any) {
       const msg = error instanceof Error ? error.message : "Registration failed";
-      if (msg.toLowerCase().includes("email already registered")) setErrors({ email: "This email is already registered" });
-      else setErrors({ general: msg });
+      if (msg.toLowerCase().includes("email already registered")) {
+        setErrors({ email: "This email is already registered" });
+      } else {
+        setErrors({ general: msg });
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleVerificationSuccess = async () => {
-    if (user) {
-      try {
-        const roomId = uuid();
-        await createBoard({ roomId, name: "Welcome Board", creator: user.username || user.email });
-        router.push(`/board/${roomId}`);
-      } catch {
-        router.push("/");
-      }
-    } else {
-      router.push("/");
-    }
-  };
-
-  const handleModalClose = () => setShowVerificationModal(false);
-
   return (
     <>
-      <div className="relative min-h-screen flex items-center justify-center bg-background overflow-hidden">
-        {/* Subtle premium blobs */}
-        <div className="absolute top-1/4 left-1/3 w-[35rem] h-[35rem] rounded-full blur-[120px] bg-[radial-gradient(1200px_600px_at_10%_-10%,_color-mix(in_oklab,_white_60%,_var(--chart-2))_0%,_transparent_60%)] opacity-30 -z-10" />
-        <div className="absolute bottom-1/4 right-1/3 w-[30rem] h-[30rem] rounded-full blur-[100px] bg-[radial-gradient(1000px_600px_at_90%_0%,_color-mix(in_oklab,_white_60%,_var(--chart-3))_0%,_transparent_55%)] opacity-20 -z-10" />
+      <h1 className="text-2xl font-semibold text-center">Create your account</h1>
+      <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <Input name="username" placeholder="Username" value={formData.username} onChange={handleInput} />
+        {errors.username && <p className="text-destructive text-sm">{errors.username}</p>}
 
-        {/* Glassmorphic card */}
-        <div className="w-full max-w-md p-10 space-y-8 bg-card/70 backdrop-blur-xl rounded-3xl border border-border shadow-md relative z-10">
-          <h1 className="text-3xl font-extrabold text-foreground text-center">Create Your Account</h1>
+        <Input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInput} />
+        {errors.email && <p className="text-destructive text-sm">{errors.email}</p>}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Input
-                name="username"
-                type="text"
-                placeholder="Username"
-                value={formData.username}
-                onChange={handleInputChange}
-                disabled={isSubmitting}
-                className={`rounded-lg border border-border px-4 py-3 focus:ring-2 focus:ring-primary ${errors.username ? "border-destructive" : ""}`}
-              />
-              {errors.username && <p className="text-sm text-destructive mt-1">{errors.username}</p>}
-            </div>
+        <Input name="password" type="password" placeholder="Password" value={formData.password} onChange={handleInput} />
+        {errors.password && <p className="text-destructive text-sm">{errors.password}</p>}
 
-            <div>
-              <Input
-                name="email"
-                type="email"
-                placeholder="Email"
-                value={formData.email}
-                onChange={handleInputChange}
-                disabled={isSubmitting}
-                className={`rounded-lg border border-border px-4 py-3 focus:ring-2 focus:ring-primary ${errors.email ? "border-destructive" : ""}`}
-              />
-              {errors.email && <p className="text-sm text-destructive mt-1">{errors.email}</p>}
-            </div>
+        <Input name="teamName" placeholder="Team name (optional)" value={formData.teamName} onChange={handleInput} />
 
-            <div>
-              <Input
-                name="password"
-                type="password"
-                placeholder="Password"
-                value={formData.password}
-                onChange={handleInputChange}
-                disabled={isSubmitting}
-                className={`rounded-lg border border-border px-4 py-3 focus:ring-2 focus:ring-primary ${errors.password ? "border-destructive" : ""}`}
-              />
-              {errors.password && <p className="text-sm text-destructive mt-1">{errors.password}</p>}
-            </div>
+        {errors.general && <p className="text-destructive text-sm">{errors.general}</p>}
 
-            <div>
-              <Input
-                name="teamName"
-                type="text"
-                placeholder="Team Name (optional)"
-                value={formData.teamName}
-                onChange={handleInputChange}
-                disabled={isSubmitting}
-                className="rounded-lg border border-border px-4 py-3 focus:ring-2 focus:ring-primary"
-              />
-            </div>
+        <Button type="submit" disabled={isSubmitting} className="w-full rounded-xl bg-gradient-to-br from-[var(--chart-2)] via-[var(--chart-3)] to-[var(--chart-1)] text-primary-foreground font-semibold shadow-sm">
+          {isSubmitting ? "Creating account..." : "Create account"}
+        </Button>
 
-            {errors.general && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3 text-center text-sm text-destructive">
-                {errors.general}
-              </div>
-            )}
+        <p className="text-center text-sm">
+          Already have an account? <Link href="/login" className="text-blue-600 hover:underline">Log in</Link>
+        </p>
+      </form>
 
-            <Button
-              type="submit"
-              className="w-full rounded-xl bg-gradient-to-br from-[var(--chart-2)] via-[var(--chart-3)] to-[var(--chart-1)] text-primary-foreground font-semibold shadow-sm hover:shadow-md transition"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Creating Account..." : "Register"}
-            </Button>
-          </form>
-
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            Already have an account?{" "}
-            <a href="/login" className="text-primary hover:underline">
-              Login
-            </a>
-          </p>
-        </div>
-      </div>
-
-      <EmailVerificationModal
+      <EmailVerificationDialog
         isOpen={showVerificationModal}
-        onClose={handleModalClose}
-        email={formData.email}
-        onSuccess={handleVerificationSuccess}
+        onClose={() => setShowVerificationModal(false)}
+        email={registeredEmail}
       />
     </>
   );

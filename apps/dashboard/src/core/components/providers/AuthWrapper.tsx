@@ -1,7 +1,7 @@
 "use client";
 
+import { AuthProvider } from "@/core/hook/auth-context";
 import { useEffect } from "react";
-import { AuthProvider } from "../../../../context/authContext";
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {

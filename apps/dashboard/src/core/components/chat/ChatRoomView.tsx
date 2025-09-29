@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../../../../context/authContext';
 import { ChatRoom, ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/chatApi';
 import chatSocketService from '@/utils/chatSocketService';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
+import { useAuth } from '@/core/hook/auth-context';
 
 interface ChatRoomViewProps {
   roomId: string;

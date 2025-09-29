@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { v4 as uuid } from "uuid";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import {
@@ -14,7 +13,7 @@ import {
   DialogFooter,
 } from "../../ui/dialog";
 import { toast } from "sonner";
-import { useAuth } from "../../../../../context/authContext";
+import { useAuth } from "@/core/hook/auth-context";
 
 interface NewBoardModalProps {
   open: boolean;
@@ -23,31 +22,55 @@ interface NewBoardModalProps {
 
 export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
   const router = useRouter();
-  const { user } = useAuth(); // Get current user
+  const { user, accessToken } = useAuth();
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [publicToken, setPublicToken] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  const boardUrl = boardId ? `${window.location.origin}/board/${boardId}` : "";
+  const boardUrl =
+    boardId && publicToken
+      ? `${window.location.origin}/board/${boardId}?token=${publicToken}`
+      : "";
 
   const handleCreate = async () => {
     if (!user || !boardName.trim()) return;
 
     setIsCreating(true);
     try {
-      const newBoardId = uuid();
+      // 1. Create the board
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_GATEWAY_URL}/board/boards`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ title: boardName }),
+        }
+      );
 
-      // Mock board creation
-      console.log("Creating board with:", {
-        id: newBoardId,
-        name: boardName.trim(),
-        creatorId: user.id,
-      });
+      if (!res.ok) throw new Error("Failed to create board");
+      const board = await res.json();
+      setBoardId(board._id);
 
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // 2. Generate a public link with viewer role
+      const linkRes = await fetch(
+        `${process.env.NEXT_PUBLIC_GATEWAY_URL}/board/boards/${board._id}/public-link`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ role: "viewer" }),
+        }
+      );
 
-      setBoardId(newBoardId);
+      if (!linkRes.ok) throw new Error("Failed to create public link");
+      const linkData = await linkRes.json();
+      setPublicToken(linkData.publicLink.token);
       toast.success("Board created successfully!");
     } catch (error) {
       console.error("Failed to create board:", error);
@@ -64,10 +87,19 @@ export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
   };
 
   const handleOpenBoard = () => {
-    if (!boardId) return;
+    if (!boardUrl) return;
+    router.push(boardUrl);
     onClose();
-    router.push(`/board/${boardId}`);
   };
+
+  useEffect(() => {
+    if (!open) {
+      setBoardId(null);
+      setPublicToken(null);
+      setBoardName("");
+      setIsCreating(false);
+    }
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -82,7 +114,10 @@ export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
         {!boardId ? (
           <div className="space-y-4">
             <div>
-              <label htmlFor="boardName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="boardName"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Board Name
               </label>
               <Input
@@ -110,7 +145,10 @@ export const NewBoardModal = ({ open, onClose }: NewBoardModalProps) => {
 
         <DialogFooter>
           {!boardId ? (
-            <Button onClick={handleCreate} disabled={!boardName.trim() || isCreating}>
+            <Button
+              onClick={handleCreate}
+              disabled={!boardName.trim() || isCreating}
+            >
               {isCreating ? "Creating..." : "Create Board"}
             </Button>
           ) : (
