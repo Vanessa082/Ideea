@@ -1,4 +1,4 @@
-import { ChatMessage } from '@/types/chat';
+import { ChatMessage } from '@/core/types/chat';
 interface MessageListProps {
   messages: ChatMessage[];
 }

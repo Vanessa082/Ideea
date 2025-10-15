@@ -4,10 +4,10 @@ import { useAuth } from './auth-context';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { BoardRole } from '../types/board.types';
+import { useNotifications } from './notification-context';
 
 const REALTIME_URL = process.env.NEXT_PUBLIC_REALTIME_URL;
-let socket: Socket | null = null;
-
+let userSocket: Socket | null = null;
 interface PersonalNotification {
   type: 'ACCESS_RESPONSE' | 'NEW_INVITE' | 'ACCESS_REQUEST';
   message: string;
@@ -19,37 +19,41 @@ interface PersonalNotification {
 }
 
 export const useRealtimeNotifications = () => {
-  const { accessToken, isAuthenticated } = useAuth();
+  const { addNotification } = useNotifications();
+  const { accessToken, isAuthenticated, user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     // 1. Exit if the client is not in a state to connect
     if (!isAuthenticated || !accessToken || !REALTIME_URL) {
-      if (socket) {
-        socket.disconnect();
-        socket = null;
+      if (userSocket) {
+        userSocket.disconnect();
+        userSocket = null;
       }
       return;
     }
 
     // 2. Connect to the 'user' namespace
-    socket = io(`${REALTIME_URL}/user`, {
+    userSocket = io(`${REALTIME_URL}/user`, {
       auth: {
         token: accessToken,
+        user: user, // 👈 CRITICAL FIX: Include the user object
       },
       transports: ['websocket'],
     });
 
-    socket.on('connect', () => {
-      console.log('Realtime User Socket Connected');
+
+    userSocket.on('connect', () => {
+      console.log('Realtime User userSocket Connected');
     });
 
-    socket.on('disconnect', () => {
-      console.log('Realtime User Socket Disconnected');
+    userSocket.on('disconnect', () => {
+      console.log('Realtime User userSocket Disconnected');
     });
 
     // 3. Handler for personal notifications
-    socket.on('personalNotification', (data: PersonalNotification) => {
+    userSocket.on('personalNotification', (data: PersonalNotification) => {
+      addNotification(data);
       if (data.type === 'ACCESS_RESPONSE') {
         const toastFn = data.status === 'approved' ? toast.success : toast.error;
         toastFn(data.message, {
@@ -79,10 +83,10 @@ export const useRealtimeNotifications = () => {
 
     // 4. Cleanup on unmount/re-run
     return () => {
-      if (socket) {
-        socket.disconnect();
-        socket = null;
+      if (userSocket) {
+        userSocket.disconnect();
+        userSocket = null;
       }
     };
-  }, [isAuthenticated, accessToken, router]);
+  }, [isAuthenticated, accessToken, router, user, addNotification]);
 };

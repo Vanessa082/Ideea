@@ -2,18 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "../../ui/button";
-import { Input } from "../../ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "../../ui/dialog";
+
 import { toast } from "sonner";
 import { useAuth } from "@/core/hook/auth-context";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog";
+import { Input } from "@/core/components/ui/input";
+import { Button } from "@/core/components/ui/button";
 
 interface NewBoardModalProps {
   open: boolean;

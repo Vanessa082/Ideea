@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChatRoom, ChatMessage } from '@/types/chat';
+import { ChatRoom, ChatMessage } from '@/core/types/chat';
 import { chatApi } from '@/lib/chatApi';
 import chatSocketService from '@/utils/chatSocketService';
 import MessageList from './MessageList';

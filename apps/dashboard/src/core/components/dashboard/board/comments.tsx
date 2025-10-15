@@ -7,7 +7,7 @@ import { Comment } from "../../../types/board.types";
 import MessageList from "../../chat/MessageList";
 import MessageInput from "../../chat/MessageInput";
 import chatSocketService from "../../../../utils/chatSocketService";
-import { ChatMessage } from "../../../../types/chat";
+import { ChatMessage } from "../../../types/chat";
 
 // import { useState, useEffect } from "react";
 // import { Button } from "../../ui/button";

@@ -112,6 +112,24 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+.custom-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--color-background); /* Background color of the track */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-border); /* Color of the scrollbar thumb */
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

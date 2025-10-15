@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/core/hook/auth-context";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, FormEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/core/components/ui/button";

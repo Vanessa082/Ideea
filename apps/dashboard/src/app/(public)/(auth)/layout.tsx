@@ -1,28 +1,13 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 import Link from "next/link";
-import { Sun, Moon } from "lucide-react";
-
+import { ModeToggle } from "@/core/components/theme/mode-toggle";
+import { IdeeaIllustration } from "@/core/components/atoms/illustration";
+import { IdeeaLogo } from "@/core/components/atoms/ideea-logo";
 type Props = { children: ReactNode };
 
 export default function AuthLayout({ children }: Props) {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    // Detect system theme preference & apply to <html> class
-    const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = (v: boolean) => {
-      setIsDark(v);
-      if (v) document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
-    };
-    apply(darkQuery.matches);
-    const handler = (e: MediaQueryListEvent) => apply(e.matches);
-    darkQuery.addEventListener("change", handler);
-    return () => darkQuery.removeEventListener("change", handler);
-  }, []);
-
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors">
       {/* top bar (logo + small theme toggle) */}
@@ -35,18 +20,7 @@ export default function AuthLayout({ children }: Props) {
 
           <div className="flex items-center gap-3">
             <Link href="/docs" className="text-sm text-muted-foreground hover:text-foreground">Docs</Link>
-            <button
-              aria-label="Toggle theme"
-              onClick={() => {
-                const now = !document.documentElement.classList.contains("dark");
-                if (now) document.documentElement.classList.add("dark");
-                else document.documentElement.classList.remove("dark");
-                setIsDark(now);
-              }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80"
-            >
-              {isDark ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
+            <ModeToggle />
           </div>
         </div>
       </header>
@@ -113,50 +87,5 @@ export default function AuthLayout({ children }: Props) {
         </div>
       </main>
     </div>
-  );
-}
-
-/* ---------- small components (inline so you can copy-paste) ---------- */
-
-function IdeeaLogo({ compact }: { compact?: boolean }) {
-  return (
-    <div className={`flex items-center gap-3 ${compact ? "text-sm" : ""}`}>
-      <div
-        className={`h-9 w-9 rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10 bg-gradient-to-br from-[var(--chart-2)] via-[var(--chart-3)] to-[var(--chart-1)]`}
-        aria-hidden
-      />
-      {!compact && (
-        <div className="leading-tight">
-          <div className="font-extrabold text-lg">ideea</div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Collaborate • Plan • Execute</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* A lightweight SVG illustration inspired by the blob/grid motif.
-   - uses CSS variables (chart-1/2/3) so colors automatically change with theme */
-function IdeeaIllustration() {
-  return (
-    <svg width="420" height="380" viewBox="0 0 420 380" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <defs>
-        <linearGradient id="g1" x1="0" x2="1">
-          <stop offset="0" stopColor="var(--chart-2)" />
-          <stop offset="1" stopColor="var(--chart-3)" />
-        </linearGradient>
-        <linearGradient id="g2" x1="0" x2="1">
-          <stop offset="0" stopColor="var(--chart-1)" />
-          <stop offset="1" stopColor="var(--chart-2)" />
-        </linearGradient>
-      </defs>
-
-      <rect x="0" y="20" width="240" height="240" rx="36" fill="url(#g1)" opacity="0.95" />
-      <rect x="150" y="100" width="220" height="180" rx="36" fill="url(#g2)" opacity="0.95" />
-      <circle cx="320" cy="40" r="30" fill="var(--chart-3)" opacity="0.9" />
-      <circle cx="60" cy="280" r="28" fill="var(--chart-1)" opacity="0.9" />
-      {/* light highlight */}
-      <rect x="20" y="200" width="100" height="40" rx="8" fill="white" opacity="0.06" />
-    </svg>
   );
 }

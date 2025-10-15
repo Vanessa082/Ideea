@@ -45,8 +45,6 @@ export interface Comment {
   y: number;
 }
 
-// @/core/types/board-schema.ts
-
 export enum BoardRole {
   OWNER = "owner",
   EDITOR = "editor",
@@ -115,8 +113,20 @@ export interface BoardDocument {
   members: BoardMember[];
   invites: BoardInvite[];
   publicLink: PublicLink | null;
-  accessRequests: AccessRequest[]; // Add this
+  accessRequests: AccessRequest[];
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface UserBoard {
+  _id: string;
+  title: string;
+  slug: string;
+  ownerId: string;
+  ownerEmail: string;
+  createdAt: string; // ISO Date string
+  updatedAt: string; // ISO Date string
+  isOwner: boolean;
+  role?: BoardRole
 }

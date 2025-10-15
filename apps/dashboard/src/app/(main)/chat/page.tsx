@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChatRoom } from '../../../types/chat';
+import { ChatRoom } from '../../../core/types/chat';
 import { chatApi } from '../../../lib/chatApi';
 import { Button } from '@/core/components/ui/button';
 import { Plus } from 'lucide-react';

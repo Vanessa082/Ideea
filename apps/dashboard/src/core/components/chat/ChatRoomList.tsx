@@ -1,4 +1,4 @@
-import { ChatRoom } from '@/types/chat';
+import { ChatRoom } from '@/core/types/chat';
 import { Card, CardContent, CardHeader, CardTitle } from '@/core/components/ui/card';
 import { Users } from 'lucide-react';
 

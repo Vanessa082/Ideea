@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ChatRoom } from '@/types/chat';
+import { ChatRoom } from '@/core/types/chat';
 import { chatApi } from '@/lib/chatApi';
 import ChatRoomView from '@/core/components/chat/ChatRoomView';
 

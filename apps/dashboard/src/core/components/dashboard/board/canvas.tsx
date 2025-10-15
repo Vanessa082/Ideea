@@ -1,545 +1,662 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Stage, Layer, Transformer } from "react-konva";
-import type { KonvaEventObject } from "konva/lib/Node";
-import { v4 as uuidv4 } from 'uuid';
-import { useBoardStore } from "../../../../../store/board-store";
-import { CanvasElement, BoardEvent, Vector2d, UserPresence as UserPresenceType } from "../../../..//core/types/board.types";
-import type Konva from "konva";
-import socketService from "../../../../utils/socketService";
-import { UserPresence, useUserPresenceStore } from "./user-presence";
-import { Toolbar } from "./toolbar";
-import { ElementRenderer } from "./element-render";
-import { CommentsPanel } from "./comments";
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import {
+  Stage,
+  Layer,
+  Rect,
+  Circle,
+  Line,
+  Text as KonvaText,
+  Group,
+  Label,
+  Tag,
+  Arrow as KonvaArrow,
+} from "react-konva";
+import Konva from "konva";
+import { toast } from "sonner";
+import throttle from "lodash/throttle";
+import debounce from "lodash/debounce";
 
-// Define a type for our Konva Stage and Transformer refs
-type KonvaStageRef = Konva.Stage | null;
-type KonvaTransformerRef = Konva.Transformer | null;
 
-export default function BoardCanvas({ boardId }: { boardId: string }) {
-  const stageRef = useRef<KonvaStageRef>(null);
-  const transformerRef = useRef<KonvaTransformerRef>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+import { useCanvas } from "@/core/hook/canvas-context";
+import { useAuth } from "@/core/hook/auth-context";
+import { CanvasElement, ShapeType, Tool, ElementStyle } from "@/core/types/canvas";
+import TransformerWrapper from "../../atoms/transformer-wrapper";
 
-  // Track if we're currently drawing to prevent duplicate events
-  const currentlyDrawingRef = useRef<string | null>(null);
+/* ---------- helpers & types ---------- */
 
-  // Text editing state
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [editingTextValue, setEditingTextValue] = useState<string>('');
-  const [editingTextPosition, setEditingTextPosition] = useState({ x: 0, y: 0 });
+const ALL_SHAPE_TYPES: ShapeType[] = [
+  "rect", "circle", "triangle", "text", "sticky", "line", "arrow", "freehand", "highlighter", "image",
+];
 
-  // Eraser state
-  const lastErasedRef = useRef<string | null>(null);
+const isBox = (t: ShapeType | Tool): t is ShapeType =>
+  ["rect", "circle", "triangle", "text", "sticky"].includes(t as ShapeType);
 
-  // Line/arrow start position
-  const [lineStart, setLineStart] = useState<Vector2d | null>(null);
+const isPath = (t: ShapeType | Tool): t is ShapeType =>
+  ["line", "arrow", "freehand", "highlighter"].includes(t as ShapeType);
 
+const isDrawableShapeTool = (tool: Tool): tool is ShapeType =>
+  (ALL_SHAPE_TYPES as Tool[]).includes(tool) && !["image"].includes(tool);
+
+
+/* ---------- component ---------- */
+
+export default function Canvas({ boardId }: { boardId: string }) {
+  const { user } = useAuth();
   const {
     elements,
     addElement,
-    currentTool,
-    currentColor,
-    selectedElementId,
-    setSelectedElement,
     updateElement,
-    setDrawing,
-    isDrawing,
-    setElements,
-  } = useBoardStore();
+    deleteElement,
+    selectedId,
+    setSelectedId,
+    activeTool,
+    setActiveTool,
+    collaborators,
+    exportCanvas,
+    updateCursor,
+    defaultStyle,
+  } = useCanvas();
 
-  const { addOrUpdateUser } = useUserPresenceStore();
+  const stageRef = useRef<Konva.Stage>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
+  const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
-  // Update dimensions on window resize and initial load
+  const isDrawing = useRef(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const drawingElementCache = useRef<CanvasElement | null>(null);
+
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+
+  const [isElementBeingDragged, setIsElementBeingDragged] = useState(false);
+
+  // 1. ✅ CRITICAL STATE: Tracks if we have clicked the empty stage with the "pan" tool
+  const [isStageDraggableForPan, setIsStageDraggableForPan] = useState(false);
+
+  const currentStyle = defaultStyle as ElementStyle;
+
+  /* ---------------------- Lifecycle & Export ---------------------- */
+
   useEffect(() => {
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setDimensions({
-          width: rect.width,
-          height: rect.height,
+    (window as any).triggerKonvaExport = async (format: "png" | "svg") => {
+      const stage = stageRef.current;
+      if (!stage) return toast.error("Canvas not loaded for export.");
+      setSelectedId(null);
+
+      if (format === "png") {
+        stage.toImage({
+          mimeType: "image/png",
+          pixelRatio: 2,
+          callback: (img) => {
+            const a = document.createElement("a");
+            a.href = img.src;
+            a.download = `${boardId}-export.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            toast.success("Exported PNG");
+          },
         });
       } else {
-        // Fallback dimensions
-        setDimensions({
-          width: Math.max(320, window.innerWidth - 320), // Account for toolbar width
-          height: Math.max(400, window.innerHeight - 120), // Account for navbar height
-        });
+        exportCanvas(format === "svg" ? "svg" : "png");
       }
     };
-
-    updateDimensions();
-    
-    const handleResize = () => {
-      updateDimensions();
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Load initial board from REST API
-  useEffect(() => {
-    useBoardStore.getState().loadBoard(boardId);
-  }, [boardId]);
-
-  // Memoize the draw handler to prevent re-creating on every render
-  const handleDrawEvent = useCallback((data: { drawData: any; userId: string }) => {
-    console.log('Received draw event:', data);
-    if (data.userId !== "some-user-id") {
-      const validatedElement = validateAndTransformDrawData(data.drawData);
-      if (validatedElement) {
-        // Prevent adding groups or invalid Konva nodes
-        if (['line', 'rectangle', 'circle', 'text'].includes(validatedElement.type)) {
-          addElement(validatedElement);
-        } else {
-          console.warn('Unsupported element type for rendering:', validatedElement.type);
-        }
-      } else {
-        console.warn('Invalid drawData received:', data.drawData);
-      }
-    }
-  }, [addElement]);
-
-  useEffect(() => {
-    socketService.connect();
-    if (socketService.socketInstance) {
-      socketService.joinBoard(boardId, "some-user-id");
-
-      socketService.socketInstance.on("element:add", (payload: BoardEvent) => {
-        addElement(payload.element);
-      });
-
-      socketService.socketInstance.on("element:update", (payload: BoardEvent) => {
-        updateElement(payload.element);
-      });
-
-      socketService.socketInstance.on("presence:update", (users: { [key: string]: UserPresenceType }) => {
-        Object.values(users).forEach(user => addOrUpdateUser(user));
-      });
-
-      socketService.onDraw(handleDrawEvent);
-    }
 
     return () => {
-      if (socketService.socketInstance) {
-        socketService.socketInstance.off("element:add");
-        socketService.socketInstance.off("element:update");
-        socketService.socketInstance.off("presence:update");
+      (window as any).triggerKonvaExport = undefined;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardId, exportCanvas]);
+
+  /* ---------------------- HTML Text Editing Overlay ---------------------- */
+
+  useEffect(() => {
+    if (!editingTextId) return;
+
+    const el = elements.find((x) => x.id === editingTextId);
+    const stage = stageRef.current;
+    const container = containerRef.current;
+    if (!el || !stage || !container) return;
+
+    const textNode = stage.findOne(`#${editingTextId}`) as Konva.Text | null;
+    if (!textNode) return;
+
+    textNode.hide();
+    textNode.getLayer()?.draw();
+
+    const absPos = textNode.getAbsolutePosition();
+    const scaleFactor = stage.scaleX();
+    const rect = container.getBoundingClientRect();
+
+    const textarea = document.createElement("textarea");
+    textarea.value = el.data || "";
+    textarea.style.position = "absolute";
+
+    // Position the textarea absolutely on the screen
+    textarea.style.top = `${absPos.y * scaleFactor + stagePos.y}px`;
+    textarea.style.left = `${absPos.x * scaleFactor + stagePos.x}px`;
+
+    // Size and style the textarea to match the Konva text
+    textarea.style.width = `${Math.max(50, (el.width ?? 160) * scaleFactor)}px`;
+    textarea.style.height = `${Math.max(20, (el.height ?? 40) * scaleFactor)}px`;
+    textarea.style.fontSize = `${(el.style?.fontSize ?? 16) * scaleFactor}px`;
+    textarea.style.fontFamily = el.style?.fontFamily ?? "Arial";
+    textarea.style.padding = "4px";
+    textarea.style.margin = "0";
+    textarea.style.border = "1px solid rgba(0,0,0,0.2)";
+    textarea.style.outline = "none";
+    textarea.style.zIndex = "9999";
+    textarea.style.background = "white";
+    textarea.style.resize = "none";
+    textarea.style.lineHeight = textNode.lineHeight().toString();
+
+    document.body.appendChild(textarea);
+    textarea.focus();
+
+    const finish = () => {
+      updateElement(editingTextId, { data: textarea.value });
+      setEditingTextId(null);
+      textarea.remove();
+      textNode.show();
+      textNode.getLayer()?.draw();
+    };
+
+    textarea.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" && !ev.shiftKey) {
+        ev.preventDefault();
+        finish();
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        finish();
       }
-      socketService.offDraw();
-    };
-  }, [boardId, addElement, updateElement, addOrUpdateUser, handleDrawEvent]);
+    });
 
-  // Function to validate and transform drawData to CanvasElement
-  const validateAndTransformDrawData = (drawData: any): CanvasElement | null => {
-    if (!drawData || typeof drawData !== 'object') {
-      return null;
+    textarea.addEventListener("blur", () => {
+      finish();
+    });
+
+    return () => {
+      const existingTextareas = document.querySelectorAll("textarea");
+      existingTextareas.forEach((t) => t.remove());
+      if (textNode) {
+        textNode.show();
+        textNode.getLayer()?.draw();
+      }
+    };
+  }, [editingTextId, elements, updateElement, stagePos, scale]);
+
+  /* ---------------------- Drawing & Move Logic (Throttled) ---------------------- */
+
+  const performMoveUpdate = useCallback((selectedId: string, tool: ShapeType, sx: number, sy: number, canvasPos: { x: number; y: number }) => {
+    if (isBox(tool)) {
+      updateElement(selectedId, {
+        x: Math.min(sx, canvasPos.x),
+        y: Math.min(sy, canvasPos.y),
+        width: Math.abs(canvasPos.x - sx),
+        height: Math.abs(canvasPos.y - sy),
+      });
     }
+    else if (isPath(tool)) {
+      const el = elements.find(e => e.id === selectedId);
+      if (!el) return;
 
-    // Required properties for all shapes
-    const baseValidation = {
-      id: drawData.id || crypto.randomUUID(),
-      type: drawData.type,
-      x: typeof drawData.x === 'number' ? drawData.x : 0,
-      y: typeof drawData.y === 'number' ? drawData.y : 0,
-      color: typeof drawData.color === 'string' ? drawData.color : '#000000',
+      const newPointX = canvasPos.x - sx;
+      const newPointY = canvasPos.y - sy;
+
+      let newPoints: number[];
+
+      if (tool === "line" || tool === "arrow") {
+        newPoints = [0, 0, newPointX, newPointY];
+      }
+      else {
+        const cachedPoints = drawingElementCache.current?.points || [];
+        newPoints = [...cachedPoints, newPointX, newPointY];
+      }
+
+      updateElement(selectedId, { points: newPoints });
+
+      if (tool === "freehand" || tool === "highlighter") {
+        drawingElementCache.current = { ...el, points: newPoints };
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateElement, elements]);
+
+  const throttledMoveUpdate = useMemo(
+    () => throttle(performMoveUpdate, 33, { trailing: true }),
+    [performMoveUpdate]
+  );
+
+  const throttledCursorUpdate = useMemo(
+    () => throttle((x: number, y: number) => updateCursor(x, y), 66, { trailing: true }),
+    [updateCursor]
+  );
+
+  const debouncedSetScale = useMemo(() => debounce(setScale, 50), []);
+  const debouncedSetStagePos = useMemo(() => debounce(setStagePos, 50), []);
+
+  /* ---------------------- Drag & Transform Handlers ---------------------- */
+
+  // 2. ✅ HANDLER: Shape Drag Start
+  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Crucial: Stop the event from bubbling up and interfering with Stage drag checks.
+    e.cancelBubble = true;
+    setIsElementBeingDragged(true);
+    e.target.moveToTop();
+    e.target.getLayer()?.batchDraw();
+  };
+
+  const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const node = e.target;
+    const id = node.id();
+    updateElement(id, { x: node.x(), y: node.y() });
+
+    // 3. ✅ HANDLER: Shape Drag End
+    setIsElementBeingDragged(false);
+  };
+
+  const handleTransformEnd = (e: Konva.KonvaEventObject<any>) => {
+    const node = e.target;
+    const id = node.id();
+    const el = elements.find((x) => x.id === id);
+    if (!el) return;
+
+    requestAnimationFrame(() => {
+      if (isBox(el.type)) {
+        const newW = node.width() * node.scaleX();
+        const newH = node.height() * node.scaleY();
+        updateElement(id, {
+          x: node.x(),
+          y: node.y(),
+          width: newW,
+          height: newH,
+          rotation: node.rotation(),
+        });
+      } else {
+        updateElement(id, {
+          x: node.x(),
+          y: node.y(),
+          rotation: node.rotation(),
+        });
+      }
+      node.scaleX(1);
+      node.scaleY(1);
+    });
+  };
+
+  /* ---------------------- Zoom/Pan ---------------------- */
+
+  const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+    const stage = stageRef.current!;
+    const oldScale = stage.scaleX();
+    const pointer = stage.getPointerPosition()!;
+
+    const mousePoint = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
     };
 
-    // Type-specific validation
-    switch (drawData.type) {
-      case 'line':
-        if (!Array.isArray(drawData.points) || drawData.points.length < 4) {
-          console.warn('Invalid line: points must be an array with at least 4 elements');
-          return null;
-        }
-        return {
-          ...baseValidation,
-          type: 'line',
-          points: drawData.points.map((p: any) => typeof p === 'number' ? p : 0),
-          width: 0,
-          height: 0,
-          text: '',
-        };
+    const direction = e.evt.deltaY > 0 ? -1 : 1;
+    const newScale = oldScale * (1 + direction * 0.1);
+    const clamped = Math.max(0.2, Math.min(3, newScale));
 
-      case 'rectangle':
-      case 'circle':
-        const width = typeof drawData.width === 'number' ? drawData.width : 0;
-        const height = typeof drawData.height === 'number' ? drawData.height : 0;
-        if (Math.abs(width) <= 0 || Math.abs(height) <= 0) {
-          console.warn(`Invalid ${drawData.type}: width and height must be non-zero`);
-          return null;
-        }
-        return {
-          ...baseValidation,
-          type: drawData.type,
-          points: [],
-          width: Math.abs(width),
-          height: Math.abs(height),
-          text: '',
-        };
+    const newPos = {
+      x: pointer.x - mousePoint.x * clamped,
+      y: pointer.y - mousePoint.y * clamped,
+    };
 
-      case 'text':
-        if (typeof drawData.text !== 'string') {
-          console.warn('Invalid text: text must be a string');
-          return null;
-        }
-        return {
-          ...baseValidation,
-          type: 'text',
-          points: [],
-          width: 0,
-          height: 0,
-          text: drawData.text,
-        };
+    debouncedSetScale(clamped);
+    debouncedSetStagePos(newPos);
+  };
 
-      case 'arrow':
-        if (!Array.isArray(drawData.points) || drawData.points.length < 4) {
-          console.warn('Invalid arrow: points must be an array with at least 4 elements');
-          return null;
-        }
-        return {
-          ...baseValidation,
-          type: 'arrow',
-          points: drawData.points.map((p: any) => typeof p === 'number' ? p : 0),
-          width: 0,
-          height: 0,
-          text: '',
-        };
+  /* ---------------------- Rendering Logic ---------------------- */
 
+  const renderShape = (el: CanvasElement) => {
+    const style: ElementStyle = {
+      ...currentStyle,
+      ...(el.style || {}),
+    };
+
+    const commonProps = {
+      id: el.id,
+      x: el.x,
+      y: el.y,
+      rotation: el.rotation || 0,
+      draggable: activeTool === "pointer",
+      visible: el.type !== 'text' || el.id !== editingTextId,
+      onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
+        e.cancelBubble = true;
+        setSelectedId(el.id);
+        const node = e.target;
+        if (node.moveToTop) {
+          node.moveToTop();
+          node.getLayer()?.batchDraw();
+        }
+      },
+      onDragStart: handleDragStart,
+      onDragEnd: handleDragEnd,
+      onDblClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
+        if (el.type === 'text') {
+          setSelectedId(el.id);
+          setEditingTextId(el.id);
+        }
+      },
+      // Shapes should only listen when we are in a selection, eraser, or text editing mode.
+      listening: activeTool === "pointer" || activeTool === "eraser" || el.type === "text",
+    };
+
+    const { x, y, ...rest } = commonProps;
+
+    switch (el.type) {
+      case "rect":
+      case "sticky":
+        return (
+          <Rect
+            key={el.id}
+            x={x}
+            y={y}
+            {...rest}
+            width={el.width ?? 100}
+            height={el.height ?? 60}
+            fill={style.fill}
+            stroke={style.stroke}
+            strokeWidth={style.strokeWidth}
+            opacity={style.opacity}
+            cornerRadius={el.type === "sticky" ? 6 : 0}
+          />
+        );
+      case "circle":
+        return (
+          <Circle
+            key={el.id}
+            {...rest}
+            x={x + (el.width ?? 80) / 2}
+            y={y + (el.height ?? 80) / 2}
+            radius={(el.width ?? 80) / 2}
+            fill={style.fill}
+            stroke={style.stroke}
+            strokeWidth={style.strokeWidth}
+            opacity={style.opacity}
+          />
+        );
+      case "triangle":
+        return (
+          <Line
+            key={el.id}
+            x={x}
+            y={y}
+            {...rest}
+            points={[
+              (el.width ?? 100) / 2, 0,
+              el.width ?? 100, el.height ?? 80,
+              0, el.height ?? 80,
+            ]}
+            closed
+            fill={style.fill}
+            stroke={style.stroke}
+            strokeWidth={style.strokeWidth}
+            opacity={style.opacity}
+          />
+        );
+      case "text":
+        return (
+          <KonvaText
+            key={el.id}
+            x={x}
+            y={y}
+            {...rest}
+            text={el.data ?? "Double-click to edit"}
+            width={el.width ?? 160}
+            height={el.height ?? 40}
+            fontSize={style.fontSize}
+            fontFamily={style.fontFamily}
+            fill={style.stroke}
+            opacity={style.opacity}
+          />
+        );
+      case "line":
+        return (
+          <Line
+            key={el.id}
+            x={x}
+            y={y}
+            {...rest}
+            points={el.points ?? []}
+            stroke={style.stroke}
+            strokeWidth={style.strokeWidth}
+            lineCap="round"
+            lineJoin="round"
+            opacity={style.opacity}
+          />
+        );
+      case "arrow":
+        return (
+          <KonvaArrow
+            key={el.id}
+            x={x}
+            y={y}
+            {...rest}
+            points={el.points ?? []}
+            pointerLength={10}
+            pointerWidth={8}
+            fill={style.stroke}
+            stroke={style.stroke}
+            strokeWidth={style.strokeWidth}
+            opacity={style.opacity}
+          />
+        );
+      case "freehand":
+      case "highlighter":
+        return (
+          <Line
+            key={el.id}
+            x={x}
+            y={y}
+            {...rest}
+            points={el.points ?? []}
+            stroke={style.stroke}
+            strokeWidth={el.type === "highlighter" ? (style.strokeWidth ?? 5) * 3 : style.strokeWidth}
+            opacity={el.type === "highlighter" ? 0.4 : style.opacity}
+            lineCap="round"
+            lineJoin="round"
+            tension={0.5}
+            globalCompositeOperation={el.type === "highlighter" ? "multiply" : "source-over"}
+          />
+        );
       default:
-        console.warn(`Unsupported shape type: ${drawData.type}`);
         return null;
     }
   };
 
-  const getPointerPosition = (stage: Konva.Stage): Vector2d => {
-    const position = stage.getPointerPosition();
-    return position ? position as Vector2d : { x: 0, y: 0 };
-  }
+  const renderedElements = useMemo(() => {
+    return elements
+      .filter(el => el.id !== editingTextId || el.type !== 'text')
+      .map(el => renderShape(el));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elements, activeTool, selectedId, currentStyle, editingTextId, isElementBeingDragged]);
 
-  const handleMouseDown = (e: KonvaEventObject<MouseEvent>) => {
-    const stage = e.target.getStage();
+  /* ---------------------- Collaborators Cursors ---------------------- */
+
+  const renderedCursors = useMemo(() => {
+    return collaborators.map(c =>
+      c.cursor ? (
+        <Group key={c.clientId} x={c.cursor.x} y={c.cursor.y} listening={false}>
+          <Line points={[0, 0, 10, 20, 0, 18]} closed fill={c.color} opacity={0.9} />
+          <Label x={12} y={20}>
+            <Tag
+              fill={c.color}
+              pointerDirection="left"
+              pointerWidth={8}
+              pointerHeight={8}
+            />
+            <KonvaText
+              text={c.username}
+              fontSize={12}
+              padding={6}
+              fill="#fff"
+            />
+          </Label>
+        </Group>
+      ) : null
+    );
+  }, [collaborators]);
+
+
+  /* ---------------------- Stage Interaction Handlers ---------------------- */
+
+  // 3. ✅ CRITICAL HANDLER: Isolates Stage Pan start logic
+  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const stage = stageRef.current;
     if (!stage) return;
-    const pos = getPointerPosition(stage);
+    const pointerPos = stage.getPointerPosition();
+    if (!pointerPos) return;
 
-    if (currentTool === 'eraser') {
-      // Hit test to find top node and remove its element from store
-      const shape = stage.getIntersection(pos as any);
-      const id = shape?.id?.();
-      if (id) {
-        useBoardStore.getState().removeElement(id);
+    const stageTransform = stage.getAbsoluteTransform().copy();
+    stageTransform.invert();
+    const canvasPos = stageTransform.point(pointerPos);
+
+    if (e.target !== stage) {
+      const shapeId = e.target.id();
+      if (activeTool === "eraser" && shapeId) {
+        deleteElement(shapeId);
+        return;
       }
-      return; // Do not start drawing
+      if (activeTool === "pointer") {
+        // Let the shape's onClick/onDragStart handle the event (drag is handled by the shape's own draggable prop)
+        return;
+      }
     }
 
-    if (currentTool === 'fill') {
-      // Fill tool: change color of clicked shape
-      const shape = stage.getIntersection(pos as any);
-      const id = shape?.id?.();
-      if (id) {
-        const element = elements.find(el => el.id === id);
-        if (element) {
-          const updatedElement = { ...element, color: currentColor };
-          updateElement(updatedElement);
-          socketService.sendElementUpdate(boardId, updatedElement);
-        }
+    if (e.target === stage) {
+      setSelectedId(null);
+
+      if (activeTool === "pan") {
+        // Manually enable Stage drag only when pan tool is active and we clicked empty space
+        setIsStageDraggableForPan(true);
+        return;
       }
+      if (activeTool === "pointer") return;
+    }
+
+    if (!isDrawableShapeTool(activeTool)) {
       return;
     }
 
-    if (currentTool === 'pen') {
-      setDrawing(true);
-      const elementId = uuidv4();
-      currentlyDrawingRef.current = elementId;
-      const newElement: CanvasElement = {
-        id: elementId,
-        type: 'line',
-        points: [pos.x, pos.y], // start with first point
-        x: 0, y: 0,
-        color: currentColor,
-        strokeWidth: 5,
-      };
-      addElement(newElement);
-    } else if (currentTool === 'brush') {
-      setDrawing(true);
-      const elementId = uuidv4();
-      currentlyDrawingRef.current = elementId;
-      const newElement: CanvasElement = {
-        id: elementId,
-        type: 'line',
-        points: [pos.x, pos.y], // start with first point
-        x: 0, y: 0,
-        color: currentColor,
-        strokeWidth: 10,
-      };
-      addElement(newElement);
-    } else if (currentTool === 'rectangle') {
-      setDrawing(true);
-      const elementId = uuidv4();
-      currentlyDrawingRef.current = elementId;
-      const newElement: CanvasElement = {
-        id: elementId,
-        type: 'rectangle',
-        x: pos.x, y: pos.y,
-        width: 0, height: 0,
-        color: currentColor,
-      };
-      addElement(newElement);
-    } else if (currentTool === 'circle') {
-      setDrawing(true);
-      const elementId = uuidv4();
-      currentlyDrawingRef.current = elementId;
-      const newElement: CanvasElement = {
-        id: elementId,
-        type: 'circle',
-        x: pos.x, y: pos.y,
-        width: 0, height: 0,
-        color: currentColor,
-      };
-      addElement(newElement);
-    } else if (currentTool === 'line' || currentTool === 'arrow') {
-      setLineStart(pos);
-    } else if (currentTool === 'text') {
-      const newElement: CanvasElement = {
-        id: uuidv4(),
-        type: 'text',
-        x: pos.x, y: pos.y,
-        text: 'Type something...',
-        color: currentColor,
-      };
-      addElement(newElement);
-      // Persist and broadcast text immediately
-      useBoardStore.getState().persistDraw(boardId, newElement);
-      socketService.sendElementAdd(boardId, newElement);
-      socketService.sendDraw(boardId, newElement, "some-user-id");
-    }
+    const shapeType = activeTool;
+    const initialWidth = isBox(shapeType) ? 5 : 1;
+    const initialHeight = isBox(shapeType) ? 5 : 1;
 
-    const clickedOnEmpty = e.target === stage;
-    if (clickedOnEmpty) {
-      setSelectedElement(null);
-      if (transformerRef.current) {
-        transformerRef.current.nodes([]);
-      }
-    }
+    const newEl: CanvasElement = {
+      id: crypto.randomUUID(),
+      type: shapeType,
+      creatorId: user?.id || "guest",
+      createdAt: Date.now(),
+      x: canvasPos.x,
+      y: canvasPos.y,
+      width: initialWidth,
+      height: initialHeight,
+      rotation: 0,
+      style: {
+        ...currentStyle,
+        stroke: shapeType === "highlighter" ? "rgba(255, 200, 0, 0.6)" : currentStyle.stroke,
+        fill: shapeType === "sticky" ? "#FFFF88" : currentStyle.fill,
+      },
+      data: shapeType === "text" ? "Double-click to edit" : "",
+      points: isPath(shapeType) ? [0, 0] : undefined,
+    };
+
+    const addedId = addElement(newEl);
+    if (typeof addedId !== 'string') return;
+
+    setSelectedId(addedId);
+    isDrawing.current = true;
+    startPos.current = canvasPos;
+    drawingElementCache.current = newEl;
   };
 
-  const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
-    const stage = e.target.getStage();
+  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const stage = stageRef.current;
     if (!stage) return;
-    const pos = getPointerPosition(stage);
+    const pointerPos = stage.getPointerPosition();
+    if (!pointerPos) return;
 
-    if (currentTool === 'eraser') {
-      // Eraser on drag
-      const shape = stage.getIntersection(pos as any);
-      const id = shape?.id?.();
-      if (id && id !== lastErasedRef.current) {
-        useBoardStore.getState().removeElement(id);
-        lastErasedRef.current = id;
-      }
-      return;
+    const stageTransform = stage.getAbsoluteTransform().copy();
+    stageTransform.invert();
+    const canvasPos = stageTransform.point(pointerPos);
+
+    if (user?.id) {
+      throttledCursorUpdate(canvasPos.x, canvasPos.y);
     }
 
-    if (!isDrawing || !currentlyDrawingRef.current) return;
-    const latestElement = elements[elements.length - 1];
+    if (!isDrawing.current || !selectedId) return;
 
-    if (!latestElement || latestElement.id !== currentlyDrawingRef.current) return;
+    const sx = startPos.current.x;
+    const sy = startPos.current.y;
+    const tool = activeTool as ShapeType;
 
-    let updatedElement: CanvasElement | null = null;
-    if (currentTool === 'pen') {
-      // Only add a point if we moved enough to smooth the line
-      const pts = latestElement.points || [];
-      const lastX = pts[pts.length - 2] ?? pos.x;
-      const lastY = pts[pts.length - 1] ?? pos.y;
-      const dx = pos.x - lastX;
-      const dy = pos.y - lastY;
-      const dist2 = dx * dx + dy * dy;
-      const minDist2 = 3 * 3; // threshold in px^2
-      const newPoints = dist2 >= minDist2 ? pts.concat([pos.x, pos.y]) : pts;
-      updatedElement = { ...latestElement, points: newPoints };
-    } else if (currentTool === 'rectangle') {
-      const newWidth = pos.x - latestElement.x;
-      const newHeight = pos.y - latestElement.y;
-      updatedElement = { ...latestElement, width: newWidth, height: newHeight };
-    } else if (currentTool === 'circle') {
-      const radius = Math.sqrt(Math.pow(pos.x - latestElement.x, 2) + Math.pow(pos.y - latestElement.y, 2));
-      updatedElement = { ...latestElement, width: radius, height: radius };
-    }
-
-    if (updatedElement) {
-      // Only update local state, no socket traffic here
-      setElements(elements.slice(0, elements.length - 1).concat(updatedElement));
-    }
+    throttledMoveUpdate(selectedId, tool, sx, sy, canvasPos);
   };
 
+  // 4. ✅ CRITICAL HANDLER: Stage Pan End/Drawing End
   const handleMouseUp = () => {
-    if (lineStart) {
-      // Create line or arrow
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pos = getPointerPosition(stage);
-      const elementId = uuidv4();
-      const newElement: CanvasElement = {
-        id: elementId,
-        type: currentTool === 'arrow' ? 'arrow' : 'line',
-        points: [lineStart.x, lineStart.y, pos.x, pos.y],
-        x: 0, y: 0,
-        color: currentColor,
-        strokeWidth: 5,
-      };
-      addElement(newElement);
-      useBoardStore.getState().persistDraw(boardId, newElement);
-      socketService.sendElementAdd(boardId, newElement);
-      socketService.sendDraw(boardId, newElement, "some-user-id");
-      setLineStart(null);
-      return;
-    }
+    if (isDrawing.current) {
+      isDrawing.current = false;
+      drawingElementCache.current = null;
 
-    if (isDrawing && currentlyDrawingRef.current) {
-      setDrawing(false);
-      const latestElement = elements[elements.length - 1];
-      console.log('Mouse up - latest element:', latestElement);
-
-      if (latestElement && latestElement.type !== 'text' && latestElement.id === currentlyDrawingRef.current) {
-        // Only send complete shapes - validate before sending
-        if (isShapeComplete(latestElement)) {
-          console.log('Sending complete element:', latestElement);
-          // Persist to REST API and send realtime events
-          useBoardStore.getState().persistDraw(boardId, latestElement);
-          socketService.sendElementAdd(boardId, latestElement);
-          socketService.sendDraw(boardId, latestElement, "some-user-id");
-        } else {
-          console.log('Removing incomplete element:', latestElement);
-          // Remove incomplete element from local state
-          setElements(elements.slice(0, elements.length - 1));
-        }
+      if (isDrawableShapeTool(activeTool)) {
+        setActiveTool("pointer");
       }
-
-      // Clear the currently drawing reference
-      currentlyDrawingRef.current = null;
     }
-    // Reset eraser last erased
-    lastErasedRef.current = null;
+
+    // Disable the Stage Pan state on mouse up
+    setIsStageDraggableForPan(false);
   };
 
-  // Helper function to check if a shape is complete
-  const isShapeComplete = (element: CanvasElement): boolean => {
-    switch (element.type) {
-      case 'line':
-        return Array.isArray(element.points) && element.points.length >= 6; // at least 3 points for smoother stroke
-      case 'rectangle':
-      case 'circle':
-        return Math.abs(element.width ?? 0) > 5 && Math.abs(element.height ?? 0) > 5;
-      case 'text':
-        return true;
-      default:
-        return false;
-    }
-  };
-
-  const onElementDragEnd = (element: CanvasElement) => {
-    socketService.sendElementUpdate(boardId, element);
-  };
-
-  useEffect(() => {
-    if (selectedElementId) {
-      const selectedNode = stageRef.current?.findOne(`#${selectedElementId}`);
-      if (selectedNode) {
-        transformerRef.current?.nodes([selectedNode]);
-        transformerRef.current?.getLayer()?.batchDraw();
-      }
-    } else if (transformerRef.current) {
-      transformerRef.current.nodes([]);
-    }
-  }, [selectedElementId]);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
-      {/* Toolbar - fixed width on larger screens, collapsible on mobile */}
-      <div className="flex-shrink-0">
-        <Toolbar />
-      </div>
+    <div ref={containerRef} className="w-full h-full relative">
+      <Stage
+        ref={stageRef}
+        width={window.innerWidth}
+        height={window.innerHeight - 112}
+        scaleX={scale}
+        scaleY={scale}
+        x={stagePos.x}
+        y={stagePos.y}
 
-      {/* Canvas container - fills remaining space */}
-      <div
-        ref={containerRef}
-        className="flex-1 min-w-0 min-h-0 relative overflow-hidden"
+        draggable={isStageDraggableForPan}
+        onDragEnd={e => {
+          setStagePos({ x: e.target.x(), y: e.target.y() });
+          setIsStageDraggableForPan(false); // Reset just in case
+        }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        style={{
+          cursor: activeTool === "pointer"
+            ? (isElementBeingDragged ? "grabbing" : "default")
+            : activeTool === "pan"
+              ? (isStageDraggableForPan ? "grabbing" : "grab") // Change cursor based on if drag started
+              : "crosshair"
+        }}
       >
-        <Stage
-          width={dimensions.width}
-          height={dimensions.height}
-          ref={stageRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-        >
-          <Layer>
-            <ElementRenderer onElementClick={(e: KonvaEventObject<MouseEvent>) => {
-              const node = e.target;
-              if ('id' in node) { // Check if node has an id property
-                const id = node.id();
-                setSelectedElement(id);
-                // Check if it's a text element for editing
-                const element = elements.find(el => el.id === id);
-                if (element && element.type === 'text') {
-                  const rect = node.getClientRect();
-                  const stageBox = stageRef.current?.container().getBoundingClientRect();
-                  if (stageBox) {
-                    setEditingTextId(id);
-                    setEditingTextValue(element.text || '');
-                    setEditingTextPosition({
-                      x: stageBox.left + rect.x,
-                      y: stageBox.top + rect.y,
-                    });
-                  }
-                }
-              }
-              e.cancelBubble = true;
-            }} onElementDragEnd={onElementDragEnd} />
-            <Transformer ref={transformerRef} />
-          </Layer>
-          <UserPresence />
-        </Stage>
-        
-        {/* Text editing input */}
-        {editingTextId && (
-          <input
-            type="text"
-            value={editingTextValue}
-            onChange={(e) => setEditingTextValue(e.target.value)}
-            onBlur={() => {
-              if (editingTextId) {
-                const updatedElement = elements.find(el => el.id === editingTextId);
-                if (updatedElement) {
-                  const newElement = { ...updatedElement, text: editingTextValue };
-                  updateElement(newElement);
-                  socketService.sendElementUpdate(boardId, newElement);
-                }
-              }
-              setEditingTextId(null);
-              setEditingTextValue('');
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.currentTarget.blur();
-              }
-            }}
-            className="absolute z-[1000] px-2 py-1 text-base border border-gray-300 bg-white rounded shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            style={{
-              left: Math.max(0, Math.min(editingTextPosition.x, dimensions.width - 200)),
-              top: Math.max(0, Math.min(editingTextPosition.y, dimensions.height - 40)),
-            }}
-            autoFocus
-          />
-        )}
-      </div>
+        <Layer listening={false}>
+          {renderedCursors}
+        </Layer>
 
-      {/* Comments/Chat Panel - fixed width on the right */}
-      <div className="flex-shrink-0">
-        <CommentsPanel />
-      </div>
+        <Layer>
+          {renderedElements}
+          <TransformerWrapper
+            selectedId={selectedId}
+            elements={elements}
+            onTransformEnd={handleTransformEnd}
+          />
+        </Layer>
+      </Stage>
     </div>
   );
 }

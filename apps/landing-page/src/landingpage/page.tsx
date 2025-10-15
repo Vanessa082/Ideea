@@ -18,8 +18,6 @@ import {
   Github,
   Twitter,
   Linkedin,
-  Sun,
-  Moon,
   Menu,
   X,
   ChevronLeft,
@@ -28,6 +26,7 @@ import {
 } from 'lucide-react';
 import Head from 'next/head';
 import { Button } from '@/components/ui/button';
+import { ModeToggle } from '../../theme/mode-toggle';
 
 
 type Slide = { icon: React.ComponentType<any>; title: string; description: string };
@@ -319,13 +318,7 @@ const LandingPage: React.FC = () => {
               >
                 Get Started
               </Link>
-              <Button
-                aria-label="Toggle theme"
-                onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80"
-              >
-                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-              </Button>
+              <ModeToggle />
             </div>
 
             {/* Mobile */}
@@ -367,12 +360,7 @@ const LandingPage: React.FC = () => {
                   >
                     Get Started
                   </Link>
-                  <Button
-                    onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary hover:bg-secondary/80"
-                  >
-                    {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                  </Button>
+                  <ModeToggle />
                 </div>
               </div>
             </div>

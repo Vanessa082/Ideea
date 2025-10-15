@@ -20,8 +20,8 @@ import {
 import { useAuth } from "@/core/hook/auth-context";
 import { toast } from "sonner";
 import { Copy, Link, UserPlus, XCircle, Users, Trash2 } from "lucide-react";
-import { BoardRole, BoardInvite, BoardMember, AccessRequest } from "@/core/types/board.types";
 import { io, Socket } from 'socket.io-client';
+import { AccessRequest, BoardInvite, BoardMember, BoardRole } from "@/core/types/board.types";
 
 interface InviteModalProps {
   boardId: string;
@@ -83,14 +83,16 @@ export default function InviteModal({ boardId, open, onClose }: InviteModalProps
       fetchBoardDetails();
 
       boardSocket = io(`${REALTIME_URL}/board`, {
-        auth: { token: accessToken },
+        auth: {
+          token: accessToken,
+          user: user,
+        },
         transports: ['websocket'],
       });
 
       boardSocket.on('connect', () => {
         boardSocket?.emit('joinBoard', { boardId });
       });
-
       boardSocket.on('board.member.added', (payload: any) => {
         if (payload.boardId === boardId) {
           toast.info(`${payload.email || payload.userId} joined the board!`);
@@ -111,7 +113,7 @@ export default function InviteModal({ boardId, open, onClose }: InviteModalProps
         boardSocket.disconnect();
       }
     };
-  }, [open, boardId, accessToken]);
+  }, [open, boardId, accessToken, user]);
 
   const handleApproveAccess = async (requestId: string, requestedRole: BoardRole) => {
     const request = accessRequests.find(r => r._id === requestId);
